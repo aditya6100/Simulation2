@@ -1,0 +1,213 @@
+:root{
+  --panel-bg: rgba(12, 16, 22, 0.65);
+  --panel-border: rgba(255,255,255,0.10);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.72);
+  --shadow: rgba(0,0,0,0.35);
+}
+
+html, body{
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0b0f14;
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+canvas{
+  display: block;
+}
+
+#crosshair{
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.85;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+#crosshair.active::before,
+#crosshair.active::after {
+  background: #ffeb3b;
+  box-shadow: 0 0 8px rgba(255, 235, 59, 0.8);
+}
+
+#crosshair.active {
+  transform: translate(-50%, -50%) scale(1.4);
+}
+
+#crosshair::before,
+#crosshair::after{
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+
+#crosshair::before{
+  width: 14px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+}
+
+#crosshair::after{
+  width: 2px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+}
+
+#ui{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.panel{
+  position: absolute;
+  min-width: 210px;
+  max-width: 280px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 12px 30px var(--shadow);
+  border-radius: 10px;
+  padding: 10px 12px;
+  backdrop-filter: blur(8px);
+  pointer-events: auto; /* Enable interaction */
+}
+
+#floorSelect,
+#qualitySelect {
+  cursor: pointer;
+}
+
+.panel-title{
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.panel-body{
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+#panel-left-top{ left: 14px; top: 14px; }
+#panel-right-top{ right: 14px; top: 14px; text-align: right; }
+#panel-left-bottom{ left: 14px; bottom: 14px; }
+
+.k{
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+#overlay{
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, rgba(10,14,20,0.70), rgba(10,14,20,0.92));
+  z-index: 10;
+}
+
+.overlay-card{
+  width: min(520px, calc(100vw - 28px));
+  background: rgba(18, 24, 32, 0.78);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 18px 70px rgba(0,0,0,0.45);
+  text-align: center;
+}
+
+.overlay-title{
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.overlay-sub{
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.overlay-floor{
+  margin: 0 auto 12px;
+  text-align: left;
+  width: min(320px, 92%);
+}
+
+.overlay-floor label{
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.overlay-floor select{
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+#startBtn{
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  color: var(--text);
+  font-weight: 700;
+}
+
+#startBtn:hover{
+  background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.07));
+}
+
+.overlay-hint{
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.room-label{
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  padding: 8px 16px;
+  border-radius: 4px;
+  background: #001f3f; /* Dark Blue */
+  border: 2px solid #ffffff33;
+  color: #ffffff;
+  font-family: 'Arial', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  text-align: center;
+}

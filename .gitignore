@@ -1,0 +1,12 @@
+tmp_sh3d/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs and local environment files
+*.log
+.env
+.env.*

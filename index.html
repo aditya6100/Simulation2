@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>College Lab Simulation Pro</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="icon" href="data:," />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.167.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.167.1/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      .k-btn { color: #00ffcc; font-weight: bold; border: 1px solid #00ffcc; padding: 0 4px; border-radius: 3px; background: rgba(0,255,204,0.1); }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <div id="panel-left-top" class="panel">
+        <div class="panel-title">Navigation</div>
+        <div class="panel-body">
+          <div><span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> Walk</div>
+          <div><span class="k">Shift</span> Sprint</div>
+          <div><span class="k">Esc</span> Menu</div>
+        </div>
+      </div>
+
+      <div id="panel-right-top" class="panel">
+        <div class="panel-title">Interactive Systems</div>
+        <div class="panel-body">
+          <div><span class="k-btn">E</span> Interact / Use / Sit</div>
+          <div><span class="k-btn">F</span> Tactical Flashlight</div>
+          <div><span class="k-btn">R</span> Toggle Storm/Rain</div>
+          <div><span class="k-btn">M</span> Emergency Lockdown</div>
+        </div>
+        <div class="panel-title" style="margin-top:10px;">Floor Selection</div>
+        <div class="panel-body">
+          <select id="floorSelect" style="width:100%; background:#111; color:white; border:1px solid #333; padding:5px;">
+            <option value="5thfloor">5th Floor</option>
+            <option value="4thfloor" selected>4th Floor - Labs</option>
+            <option value="3rdfloor">3rd Floor</option>
+            <option value="2ndfloor">2nd Floor</option>
+            <option value="1stfloor">1st Floor</option>
+            <option value="groundgloor">Ground Floor</option>
+          </select>
+        </div>
+        <div class="panel-title" style="margin-top:10px;">Quality</div>
+        <div class="panel-body">
+          <select id="qualitySelect" style="width:100%; background:#111; color:white; border:1px solid #333; padding:5px;">
+            <option value="performance" selected>Performance</option>
+            <option value="balanced">Balanced</option>
+            <option value="quality">Quality</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="panel-left-bottom" class="panel">
+        <div class="panel-title">Current Zone</div>
+        <div class="panel-body" id="zoneName" style="color:#00ffcc; font-size:1.2em;">Main Corridor</div>
+      </div>
+    </div>
+
+    <div id="overlay">
+      <div class="overlay-card">
+        <div class="overlay-title">College Lab Simulation</div>
+        <div class="overlay-sub">Ultra-Realistic Environment Engine</div>
+        <div class="overlay-floor">
+          <label for="floorSelectOverlay">Start Floor</label>
+          <select id="floorSelectOverlay">
+            <option value="5thfloor">5th Floor</option>
+            <option value="4thfloor" selected>4th Floor - Labs</option>
+            <option value="3rdfloor">3rd Floor</option>
+            <option value="2ndfloor">2nd Floor</option>
+            <option value="1stfloor">1st Floor</option>
+            <option value="groundgloor">Ground Floor</option>
+          </select>
+        </div>
+        <button id="startBtn" type="button">INITIALIZE SYSTEMS</button>
+        <div class="overlay-hint">Audio and Physics will initialize on start.</div>
+      </div>
+    </div>
+
+    <div id="crosshair"></div>
+    <script type="module" src="./script.js?v=20260430-72"></script>
+  </body>
+</html>

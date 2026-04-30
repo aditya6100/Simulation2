@@ -1,0 +1,51 @@
+{
+  "groundgloor": {
+    "left": [
+      "NCC ROOM",
+      "GYMKHANA",
+      "GYMKHANA",
+      "NSS ROOM",
+      "NSS ROOM",
+      "CLASSROOM G001",
+      "CLASSROOM G002",
+      "CLASSROOM G003"
+    ],
+    "right": [
+      "CLASSROOM G004",
+      "CLASSROOM G005",
+      "LADIES WASHROOM",
+      "CLASSROOM G003",
+      "GENTS WASHROOM"
+    ]
+  },
+  "1stfloor": {
+    "left": ["LAB 101", "LAB 102", "LAB 103", "LAB 106"],
+    "right": ["LAB 104", "LAB 105"]
+  },
+  "2ndfloor": {
+    "left": [
+      "HEAD OF DEPARTMENT (CSE)",
+      "DEPARTMENT LIBRARY",
+      "SERVER ROOM",
+      "TUTORIAL ROOM",
+      "LAB 205",
+      "LAB 208"
+    ],
+    "right": ["LAB 206", "LAB 207"]
+  },
+  "4thfloor": {
+    "left": [
+      "HEAD OF DEPARTMENT (E&TC)",
+      "MEETING ROOM",
+      "DEPARTMENT LIBRARY",
+      "PG CLASSROOM",
+      "LAB 404",
+      "LAB 405"
+    ],
+    "right": ["LAB 406", "LAB 407"]
+  },
+  "5thfloor": {
+    "left": ["LAB 501", "LAB 502", "LAB 503", "CLASSROOM 506"],
+    "right": ["LAB 504", "LAB 505", "LADIES ROOM", "CLASSROOM 507"]
+  }
+}
