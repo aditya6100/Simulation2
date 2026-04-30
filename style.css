@@ -305,3 +305,103 @@ canvas{
     padding: 16px 14px;
   }
 }
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .panel{
+    max-width: 190px;
+    padding: 6px 8px;
+  }
+
+  #panel-left-top{
+    left: 8px;
+    top: 8px;
+  }
+
+  #panel-right-top{
+    right: 8px;
+    top: 8px;
+  }
+
+  #panel-left-bottom{
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    width: min(230px, 38vw);
+    text-align: center;
+  }
+
+  #panel-right-top .panel-title:first-child,
+  #panel-right-top .panel-body:first-of-type,
+  #panel-left-top .panel-body{
+    display: none;
+  }
+
+  .panel-title{
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+
+  .panel-body{
+    font-size: 11px;
+    line-height: 1.25;
+  }
+
+  #floorSelect,
+  #qualitySelect{
+    min-height: 32px;
+    font-size: 12px;
+    padding: 4px 6px !important;
+  }
+
+  .touch-zone{
+    bottom: 12px;
+    width: 112px;
+    height: 112px;
+  }
+
+  #movePad{
+    left: 16px;
+  }
+
+  #lookPad{
+    right: 16px;
+  }
+
+  .touch-stick{
+    width: 44px;
+    height: 44px;
+  }
+
+  .touch-action-btn{
+    right: 142px;
+    bottom: 38px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .overlay-card{
+    width: min(460px, calc(100vw - 36px));
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    padding: 12px 14px;
+  }
+
+  .overlay-title{
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+
+  .overlay-sub,
+  .overlay-hint{
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+
+  .overlay-floor{
+    margin-bottom: 8px;
+  }
+
+  #startBtn{
+    padding: 8px 12px;
+  }
+}
