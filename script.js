@@ -25,8 +25,14 @@ const UI = {
   zoneName: document.getElementById('zoneName'),
   floorSelect: document.getElementById('floorSelect'),
   floorSelectOverlay: document.getElementById('floorSelectOverlay'),
-  qualitySelect: document.getElementById('qualitySelect')
+  qualitySelect: document.getElementById('qualitySelect'),
+  mobileControls: document.getElementById('mobileControls'),
+  movePad: document.getElementById('movePad'),
+  lookPad: document.getElementById('lookPad'),
+  mobileInteract: document.getElementById('mobileInteract')
 };
+
+const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
@@ -2460,10 +2466,22 @@ async function loadWorld() {
 
 // --- 7. PLAYER SYSTEM ---
 class FPSController {
-  constructor(cam) { this.camera = cam; this.yaw = 0; this.pitch = 0; this.enabled = false; this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3(); this.keys = {}; }
+  constructor(cam) {
+    this.camera = cam;
+    this.yaw = 0;
+    this.pitch = 0;
+    this.enabled = false;
+    this.mobileActive = false;
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.keys = {};
+    this.touchMove = { x: 0, y: 0 };
+  }
   resetInput() {
     this.keys = {};
     this.vel.set(0, 0, 0);
+    this.touchMove.x = 0;
+    this.touchMove.y = 0;
   }
   attach() { 
     document.addEventListener('mousemove', e => { if(this.enabled){ this.yaw -= e.movementX * SETTINGS.mouseSensitivity; this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch - e.movementY * SETTINGS.mouseSensitivity)); } }); 
@@ -2475,7 +2493,9 @@ class FPSController {
   update(dt, col) {
     this.camera.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')); if(!this.enabled){ this.resetInput(); this.camera.position.copy(this.pos); return; }
     const f=new THREE.Vector3(0,0,-1).applyQuaternion(this.camera.quaternion); f.y=0; f.normalize(); const r=new THREE.Vector3(1,0,0).applyQuaternion(this.camera.quaternion); r.y=0; r.normalize();
-    const w=new THREE.Vector3().addScaledVector(f, (this.keys.KeyW?1:0)-(this.keys.KeyS?1:0)).addScaledVector(r, (this.keys.KeyD?1:0)-(this.keys.KeyA?1:0)); if(w.lengthSq()>0) w.normalize();
+    const forwardInput = (this.keys.KeyW?1:0)-(this.keys.KeyS?1:0) + this.touchMove.y;
+    const sideInput = (this.keys.KeyD?1:0)-(this.keys.KeyA?1:0) + this.touchMove.x;
+    const w=new THREE.Vector3().addScaledVector(f, forwardInput).addScaledVector(r, sideInput); if(w.lengthSq()>0) w.normalize();
     this.vel.lerp(w.multiplyScalar(SETTINGS.baseSpeed*(this.keys.ShiftLeft?SETTINGS.runMultiplier:1)), Math.min(dt*15,1));
     this.pos.copy(col.move(this.pos, this.vel.clone().multiplyScalar(dt), SETTINGS.playerRadius));
     const floorY = col.getHeight(this.pos);
@@ -2487,6 +2507,74 @@ class FPSController {
     UI.zoneName.innerText = `${FLOOR_LABELS[clampedFloorIdx]} - ${zInfo.name}`;
     const desiredIndex = ALL_FLOORS.length - 1 - clampedFloorIdx;
     if (UI.floorSelect.selectedIndex !== desiredIndex) { UI.floorSelect.selectedIndex = desiredIndex; }
+  }
+}
+
+function setupMobileControls(ctrl) {
+  if (!IS_TOUCH_DEVICE || !UI.mobileControls || !UI.movePad || !UI.lookPad) return;
+
+  const bindStick = (pad, onMove, onEnd) => {
+    const stick = pad.querySelector('.touch-stick');
+    let activeId = null;
+    const radius = 52;
+
+    const update = (clientX, clientY) => {
+      const rect = pad.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = Math.max(-radius, Math.min(radius, clientX - cx));
+      const dy = Math.max(-radius, Math.min(radius, clientY - cy));
+      if (stick) stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      onMove(dx / radius, dy / radius);
+    };
+
+    pad.addEventListener('pointerdown', (e) => {
+      activeId = e.pointerId;
+      pad.setPointerCapture(activeId);
+      update(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    pad.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== activeId) return;
+      update(e.clientX, e.clientY);
+      e.preventDefault();
+    });
+    const end = (e) => {
+      if (e.pointerId !== activeId) return;
+      activeId = null;
+      if (stick) stick.style.transform = 'translate(-50%, -50%)';
+      onEnd();
+      e.preventDefault();
+    };
+    pad.addEventListener('pointerup', end);
+    pad.addEventListener('pointercancel', end);
+  };
+
+  bindStick(
+    UI.movePad,
+    (x, y) => {
+      ctrl.touchMove.x = x;
+      ctrl.touchMove.y = -y;
+    },
+    () => {
+      ctrl.touchMove.x = 0;
+      ctrl.touchMove.y = 0;
+    }
+  );
+
+  bindStick(
+    UI.lookPad,
+    (x, y) => {
+      ctrl.yaw -= x * SETTINGS.mouseSensitivity * 9;
+      ctrl.pitch = Math.max(-1.5, Math.min(1.5, ctrl.pitch - y * SETTINGS.mouseSensitivity * 9));
+    },
+    () => {}
+  );
+
+  if (UI.mobileInteract) {
+    UI.mobileInteract.addEventListener('click', () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
+    });
   }
 }
 
@@ -2510,6 +2598,7 @@ async function init() {
   }
   scene.add(sun);
   ctrl = new FPSController(camera); ctrl.attach(); 
+  setupMobileControls(ctrl);
   ROOM_LABELS = await loadJson('./room-labels.json');
   const world = await loadWorld();
   addOutdoorEnvironment();
@@ -2520,14 +2609,23 @@ async function init() {
   ctrl.pos.copy(world.floorSafeSpawns[4] || world.spawnPoint || new THREE.Vector3(50.0, SETTINGS.playerHeight, 0.0));
   ctrl.pos.y = 4 * SETTINGS.floorHeight + SETTINGS.playerHeight;
   if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
-  UI.startBtn.addEventListener('click', ()=>{
+  const startExperience = () => {
     if (UI.floorSelectOverlay && UI.floorSelectOverlay.selectedIndex !== UI.floorSelect.selectedIndex) {
       UI.floorSelect.selectedIndex = UI.floorSelectOverlay.selectedIndex;
       UI.floorSelect.dispatchEvent(new Event('change'));
     }
+    if (IS_TOUCH_DEVICE || !document.body.requestPointerLock) {
+      ctrl.enabled = true;
+      ctrl.mobileActive = true;
+      UI.overlay.style.display = 'none';
+      if (UI.mobileControls) UI.mobileControls.classList.add('active');
+      return;
+    }
     document.body.requestPointerLock();
-  });
+  };
+  UI.startBtn.addEventListener('click', startExperience);
   document.addEventListener('pointerlockchange', ()=>{
+    if (ctrl.mobileActive) return;
     ctrl.enabled = !!document.pointerLockElement;
     if (!ctrl.enabled) ctrl.resetInput();
     UI.overlay.style.display = ctrl.enabled ? 'none' : 'flex';

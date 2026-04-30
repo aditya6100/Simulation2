@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>College Lab Simulation Pro</title>
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./style.css?v=20260501-mobile" />
     <link rel="icon" href="data:," />
     <script type="importmap">
       {
@@ -85,6 +85,11 @@
     </div>
 
     <div id="crosshair"></div>
-    <script type="module" src="./script.js?v=20260430-72"></script>
+    <div id="mobileControls" aria-hidden="true">
+      <div id="movePad" class="touch-zone"><div class="touch-stick"></div></div>
+      <div id="lookPad" class="touch-zone"><div class="touch-stick"></div></div>
+      <button id="mobileInteract" class="touch-action-btn" type="button">E</button>
+    </div>
+    <script type="module" src="./script.js?v=20260501-mobile"></script>
   </body>
 </html>

@@ -14,6 +14,7 @@ html, body{
   background: #0b0f14;
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  touch-action: none;
 }
 
 canvas{
@@ -210,4 +211,97 @@ canvas{
   box-shadow: 0 4px 8px rgba(0,0,0,0.5);
   backdrop-filter: blur(4px);
   text-align: center;
+}
+
+#mobileControls{
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  display: none;
+}
+
+#mobileControls.active{
+  display: block;
+}
+
+.touch-zone{
+  position: absolute;
+  bottom: 20px;
+  width: 138px;
+  height: 138px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(10, 14, 20, 0.34);
+  pointer-events: auto;
+  touch-action: none;
+  backdrop-filter: blur(4px);
+}
+
+#movePad{
+  left: 18px;
+}
+
+#lookPad{
+  right: 18px;
+}
+
+.touch-stick{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,0.22);
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+}
+
+.touch-action-btn{
+  position: absolute;
+  right: 30px;
+  bottom: 176px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(0, 255, 204, 0.22);
+  color: #fff;
+  font-weight: 800;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+@media (max-width: 760px) {
+  .panel{
+    min-width: 0;
+    max-width: calc(50vw - 22px);
+    padding: 8px 9px;
+    border-radius: 8px;
+  }
+
+  #panel-left-top .panel-body,
+  #panel-right-top .panel-body:first-of-type{
+    display: none;
+  }
+
+  #panel-left-top{ left: 8px; top: 8px; }
+  #panel-right-top{ right: 8px; top: 8px; }
+  #panel-left-bottom{ left: 8px; bottom: 170px; }
+
+  .panel-title{
+    font-size: 10px;
+    margin-bottom: 6px;
+  }
+
+  .panel-body{
+    font-size: 12px;
+  }
+
+  .overlay-card{
+    width: min(420px, calc(100vw - 24px));
+    padding: 16px 14px;
+  }
 }
