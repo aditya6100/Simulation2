@@ -497,11 +497,19 @@ function resetFloorGroupTransform() {
   floorGroup.scale.setScalar(1);
 }
 
+function setBuildingModelVisible(visible) {
+  if (!floorGroup) return;
+  floorGroup.children.forEach((child) => {
+    if (child !== pathGroup) child.visible = visible;
+  });
+}
+
 function anchorRouteForAR() {
   if (!floorGroup || !startPos) return;
 
   floorGroup.scale.setScalar(1);
   floorGroup.position.set(-startPos.x, -0.45, -startPos.z - 1.5);
+  setBuildingModelVisible(false);
 }
 
 function init3D() {
@@ -529,6 +537,7 @@ function init3D() {
   renderer.xr.addEventListener('sessionend', () => {
     isARSessionActive = false;
     resetFloorGroupTransform();
+    setBuildingModelVisible(true);
   });
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.8));
