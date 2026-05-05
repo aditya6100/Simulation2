@@ -26,6 +26,7 @@ const UI = {
   floorSelect: document.getElementById('floorSelect'),
   floorSelectOverlay: document.getElementById('floorSelectOverlay'),
   qualitySelect: document.getElementById('qualitySelect'),
+  minimapCanvas: document.getElementById('minimap-canvas'),
   mobileControls: document.getElementById('mobileControls'),
   movePad: document.getElementById('movePad'),
   lookPad: document.getElementById('lookPad'),
@@ -69,6 +70,7 @@ let camera, renderer, ctrl = null;
 const TEXTURE_CACHE = {};
 const INSTANCED_MESHES = {};
 let ROOM_LABELS = {};
+let minimapWorld = null;
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -137,6 +139,90 @@ const GLOBAL_COLLISION = new CollisionSystem();
 // --- 3. UTILS & TEXTURES ---
 async function loadJson(url) { try { const r = await fetch(url, { cache: 'no-store' }); return r.ok ? await r.json() : []; } catch(e) { return []; } }
 const toWorld = (v) => parseFloat(v) * SETTINGS.unitScale || 0;
+
+function resizeMinimapCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.round(rect.width * dpr));
+  const height = Math.max(1, Math.round(rect.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  return { width, height, dpr };
+}
+
+function drawSimulationMinimap() {
+  if (!UI.minimapCanvas || !minimapWorld || !ctrl) return;
+  const ctx = UI.minimapCanvas.getContext('2d');
+  const { width, height, dpr } = resizeMinimapCanvas(UI.minimapCanvas);
+  const floorIdx = Math.max(0, Math.min(ALL_FLOORS.length - 1, Math.round((ctrl.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight)));
+  const floorKey = ALL_FLOORS[floorIdx];
+  const floor = minimapWorld.floorDataMap.get(floorKey);
+  if (!floor) return;
+
+  const pad = 16 * dpr;
+  const mapW = Math.max(1, floor.bounds.maxX - floor.bounds.minX);
+  const mapH = Math.max(1, floor.bounds.maxZ - floor.bounds.minZ);
+  const scale = Math.min((width - pad * 2) / mapW, (height - pad * 2) / mapH);
+  const mapPixelW = mapW * scale;
+  const mapPixelH = mapH * scale;
+  const offsetX = (width - mapPixelW) / 2;
+  const offsetY = (height - mapPixelH) / 2;
+  const toCanvasX = (x) => offsetX + (x - floor.bounds.minX) * scale;
+  const toCanvasY = (z) => offsetY + (z - floor.bounds.minZ) * scale;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1.2 * dpr;
+  ctx.strokeRect(offsetX, offsetY, mapPixelW, mapPixelH);
+
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 2.2 * dpr;
+  floor.walls.forEach((wall) => {
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(wall.x1), toCanvasY(wall.z1));
+    ctx.lineTo(toCanvasX(wall.x2), toCanvasY(wall.z2));
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = '#0ea5e9';
+  ctx.lineWidth = 3 * dpr;
+  floor.doors.forEach((door) => {
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(door.x1), toCanvasY(door.z1));
+    ctx.lineTo(toCanvasX(door.x2), toCanvasY(door.z2));
+    ctx.stroke();
+  });
+
+  const px = toCanvasX(ctrl.pos.x);
+  const py = toCanvasY(ctrl.pos.z);
+  const heading = -ctrl.yaw - Math.PI / 2;
+  ctx.translate(px, py);
+  ctx.rotate(heading);
+  ctx.fillStyle = '#14b8a6';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(9 * dpr, 0);
+  ctx.lineTo(-7 * dpr, -6 * dpr);
+  ctx.lineTo(-4 * dpr, 0);
+  ctx.lineTo(-7 * dpr, 6 * dpr);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `${11 * dpr}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(FLOOR_LABELS[floorIdx], 10 * dpr, 17 * dpr);
+}
 const toNum = (v, def = 0) => { const n = parseFloat(v); return isNaN(n) ? def : n; };
 
 function getTexture(name, type='solid', color1='#fff', color2='#eee') {
@@ -1657,6 +1743,24 @@ async function loadWorld() {
       const safeZ = THREE.MathUtils.clamp(6.0, minZ + 2.0, maxZ - 2.0);
       floorSafeSpawns[i] = new THREE.Vector3(safeX, elev + SETTINGS.playerHeight, safeZ);
     }
+    floorDataMap.set(ALL_FLOORS[i], {
+      bounds: {
+        minX: minX - 1.2,
+        maxX: maxX + 1.2,
+        minZ: minZ - 1.2,
+        maxZ: maxZ + 1.2
+      },
+      walls: wD.map((w) => ({ x1: w.p1.x, z1: w.p1.z, x2: w.p2.x, z2: w.p2.z })),
+      doors: dD.map((d) => {
+        const x = toWorld(d.x);
+        const z = toWorld(d.y);
+        const w = toWorld(d.width || 0.8);
+        const angle = -parseFloat(d.angle || 0);
+        const dx = Math.cos(angle) * w * 0.5;
+        const dz = Math.sin(angle) * w * 0.5;
+        return { x1: x - dx, z1: z - dz, x2: x + dx, z2: z + dz };
+      })
+    });
 
     const groundMainEntranceDoorIndex = ALL_FLOORS[i] === 'groundgloor'
       ? (() => {
@@ -2462,7 +2566,7 @@ async function loadWorld() {
     scene.add(shaft);
   }
   Object.values(INSTANCED_MESHES).forEach(m => { m.count = m.userData.index; m.instanceMatrix.needsUpdate = true; });
-  return { doorList, interactables, autoDoors, lifts, spawnPoint, secondFloorSpawn, floorSafeSpawns };
+  return { doorList, interactables, autoDoors, lifts, spawnPoint, secondFloorSpawn, floorSafeSpawns, floorDataMap };
 }
 
 // --- 7. PLAYER SYSTEM ---
@@ -2602,6 +2706,7 @@ async function init() {
   setupMobileControls(ctrl);
   ROOM_LABELS = await loadJson('./room-labels.json');
   const world = await loadWorld();
+  minimapWorld = world;
   addOutdoorEnvironment();
   if (UI.qualitySelect) {
     applyQualityProfile(UI.qualitySelect.value);
@@ -2717,6 +2822,7 @@ async function init() {
       console.log('Moved to 2nd floor main corridor');
     }
   });
+  window.addEventListener('resize', () => drawSimulationMinimap());
   function animate() {
     requestAnimationFrame(animate);
     const dt = Math.min(0.05, clock.getDelta());
@@ -2754,6 +2860,7 @@ async function init() {
       lf.right.position.z = lf.baseRightZ + slide;
     });
 
+    drawSimulationMinimap();
     renderer.render(scene, camera);
   }
   animate();

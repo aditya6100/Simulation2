@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>College Lab Simulation Pro</title>
-    <link rel="stylesheet" href="./style.css?v=20260504-welcome" />
+    <link rel="stylesheet" href="./style.css?v=20260506-pro-ui" />
     <link rel="icon" href="data:," />
     <script type="importmap">
       {
@@ -15,7 +15,7 @@
       }
     </script>
     <style>
-      .k-btn { color: #00ffcc; font-weight: bold; border: 1px solid #00ffcc; padding: 0 4px; border-radius: 3px; background: rgba(0,255,204,0.1); }
+      .k-btn { color: #0f766e; font-weight: bold; border: 1px solid rgba(15,118,110,0.35); padding: 0 4px; border-radius: 3px; background: rgba(20,184,166,0.12); }
     </style>
   </head>
   <body>
@@ -26,8 +26,8 @@
           <div><span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> Walk</div>
           <div><span class="k">Shift</span> Sprint</div>
           <div><span class="k">Esc</span> Menu</div>
-          <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-            <a href="navigation.html" style="color: #00ffcc; text-decoration: none; font-weight: bold; font-size: 14px;">&rarr; AR Navigation</a>
+          <div class="panel-link-row">
+            <a href="navigation.html" class="panel-link">AR Navigation</a>
           </div>
         </div>
       </div>
@@ -42,7 +42,7 @@
         </div>
         <div class="panel-title" style="margin-top:10px;">Floor Selection</div>
         <div class="panel-body">
-          <select id="floorSelect" style="width:100%; background:#111; color:white; border:1px solid #333; padding:5px;">
+          <select id="floorSelect">
             <option value="5thfloor">5th Floor</option>
             <option value="4thfloor" selected>4th Floor - Labs</option>
             <option value="3rdfloor">3rd Floor</option>
@@ -53,7 +53,7 @@
         </div>
         <div class="panel-title" style="margin-top:10px;">Quality</div>
         <div class="panel-body">
-          <select id="qualitySelect" style="width:100%; background:#111; color:white; border:1px solid #333; padding:5px;">
+          <select id="qualitySelect">
             <option value="performance" selected>Performance</option>
             <option value="balanced">Balanced</option>
             <option value="quality">Quality</option>
@@ -63,11 +63,15 @@
 
       <div id="panel-left-bottom" class="panel">
         <div class="panel-title">Current Zone</div>
-        <div class="panel-body" id="zoneName" style="color:#00ffcc; font-size:1.2em;">Main Corridor</div>
+        <div class="panel-body current-zone" id="zoneName">Main Corridor</div>
       </div>
 
-      <div id="minimap-container" style="position: absolute; bottom: 14px; right: 14px; width: 200px; height: 200px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; pointer-events: auto; backdrop-filter: blur(8px);">
-        <canvas id="minimap-canvas" style="width: 100%; height: 100%;"></canvas>
+      <div id="minimap-container">
+        <div class="minimap-header">
+          <span>Live Map</span>
+          <strong>Position</strong>
+        </div>
+        <canvas id="minimap-canvas"></canvas>
       </div>
     </div>
 
@@ -103,8 +107,8 @@
           </div>
 
           <button id="startBtn" type="button">Enter Simulation</button>
-          <div style="margin-top: 15px;">
-            <a href="navigation.html" style="color: #00ffcc; text-decoration: none; font-weight: bold; font-size: 16px; border: 1px solid #00ffcc; padding: 10px 20px; border-radius: 6px; display: inline-block;">&rarr; Go to AR Navigation</a>
+          <div class="welcome-actions">
+            <a href="navigation.html" class="secondary-action">Go to AR Navigation</a>
           </div>
           <div class="overlay-hint">Audio, physics, and controls initialize after you enter.</div>
         </div>
@@ -125,6 +129,6 @@
       <div id="lookPad" class="touch-zone"><div class="touch-stick"></div></div>
       <button id="mobileInteract" class="touch-action-btn" type="button">E</button>
     </div>
-    <script type="module" src="./script.js?v=20260504-welcome"></script>
+    <script type="module" src="./script.js?v=20260506-pro-ui"></script>
   </body>
 </html>
