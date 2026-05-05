@@ -27,6 +27,10 @@ const UI = {
   floorSelectOverlay: document.getElementById('floorSelectOverlay'),
   qualitySelect: document.getElementById('qualitySelect'),
   minimapCanvas: document.getElementById('minimap-canvas'),
+  liftDashboard: document.getElementById('liftDashboard'),
+  liftCurrentFloor: document.getElementById('liftCurrentFloor'),
+  liftButtons: document.getElementById('liftButtons'),
+  liftCloseBtn: document.getElementById('liftCloseBtn'),
   mobileControls: document.getElementById('mobileControls'),
   movePad: document.getElementById('movePad'),
   lookPad: document.getElementById('lookPad'),
@@ -37,7 +41,7 @@ const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || naviga
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
-const ENABLE_LIFT = false;
+const ENABLE_LIFT = true;
 const SMART_BOARD_PLACEMENTS = {
   groundgloor: {
     'CLASSROOM G001': { x: 43.33, z: 6.48, yaw: 0 },
@@ -75,6 +79,8 @@ let flashlight = null;
 let stormSystem = null;
 let stormActive = false;
 let emergencyLockdown = false;
+let activeLift = null;
+let liftDashboardOpen = false;
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -312,6 +318,74 @@ function activateEmergencyLockdown(world) {
   }
 
   UI.zoneName.innerText = 'Emergency lockdown cleared';
+}
+
+function getCurrentFloorIndex() {
+  if (!ctrl) return 0;
+  return Math.max(0, Math.min(ALL_FLOORS.length - 1, Math.round((ctrl.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight)));
+}
+
+function enterLift(lift) {
+  if (!ctrl || !lift || emergencyLockdown) return;
+  activeLift = lift;
+  const floorIdx = getCurrentFloorIndex();
+  ctrl.pos.set(lift.cabin.x, floorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight, lift.cabin.z);
+  ctrl.yaw = lift.yaw;
+  ctrl.pitch = 0;
+  lift.openUntil = clock.elapsedTime + 1.2;
+  openLiftDashboard(floorIdx);
+}
+
+function openLiftDashboard(currentFloorIdx) {
+  if (!UI.liftDashboard || !UI.liftButtons) return;
+  liftDashboardOpen = true;
+  ctrl.enabled = false;
+  ctrl.resetInput();
+  UI.overlay.style.display = 'none';
+  UI.liftDashboard.classList.add('active');
+  UI.liftDashboard.setAttribute('aria-hidden', 'false');
+  if (UI.liftCurrentFloor) UI.liftCurrentFloor.innerText = FLOOR_LABELS[currentFloorIdx];
+  UI.liftButtons.replaceChildren();
+
+  FLOOR_LABELS.forEach((label, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `lift-floor-btn${index === currentFloorIdx ? ' active' : ''}`;
+    btn.innerText = index === 0 ? 'G' : String(index);
+    btn.setAttribute('aria-label', label);
+    btn.addEventListener('click', () => travelLiftToFloor(index));
+    UI.liftButtons.appendChild(btn);
+  });
+
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function closeLiftDashboard() {
+  liftDashboardOpen = false;
+  activeLift = null;
+  if (UI.liftDashboard) {
+    UI.liftDashboard.classList.remove('active');
+    UI.liftDashboard.setAttribute('aria-hidden', 'true');
+  }
+  if (IS_TOUCH_DEVICE || ctrl.mobileActive || !document.body.requestPointerLock) {
+    ctrl.enabled = true;
+    return;
+  }
+  document.body.requestPointerLock();
+}
+
+function travelLiftToFloor(targetFloorIdx) {
+  if (!ctrl || !activeLift) return;
+  const targetLift = (minimapWorld?.lifts || []).find((lift) => lift.floorIndex === targetFloorIdx) || activeLift;
+  const targetY = targetFloorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight;
+  ctrl.pos.set(targetLift.cabin.x, targetY, targetLift.cabin.z);
+  ctrl.yaw = targetLift.yaw;
+  ctrl.pitch = 0;
+  targetLift.openUntil = clock.elapsedTime + 2.0;
+  UI.floorSelect.selectedIndex = ALL_FLOORS.length - 1 - targetFloorIdx;
+  if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
+  UI.zoneName.innerText = `${FLOOR_LABELS[targetFloorIdx]} - Lift Lobby`;
+  closeLiftDashboard();
 }
 const toNum = (v, def = 0) => { const n = parseFloat(v); return isNaN(n) ? def : n; };
 
@@ -1982,7 +2056,10 @@ async function loadWorld() {
       if (ALL_FLOORS[i] === '2ndfloor') {
         secondFloorSpawn = floorSafeSpawns[i] ? floorSafeSpawns[i].clone() : new THREE.Vector3(liftCall.position.x, elev + SETTINGS.playerHeight, liftCall.position.z);
       }
+      const cabinPoint = rot180(liftX - 1.15, liftZ);
       lifts.push({
+        floorIndex: i,
+        floorKey: ALL_FLOORS[i],
         left: doorLeft,
         right: doorRight,
         baseLeftZ: doorLeft.position.z,
@@ -1991,6 +2068,8 @@ async function loadWorld() {
         openUntil: 0,
         openAmount: 0,
         call: liftCall,
+        cabin: new THREE.Vector3(cabinPoint.x, elev + SETTINGS.playerHeight, cabinPoint.z),
+        yaw: Math.PI / 2,
         center: new THREE.Vector3((doorLeft.position.x + doorRight.position.x) * 0.5, elev + 1.1, (doorLeft.position.z + doorRight.position.z) * 0.5)
       });
 
@@ -2759,8 +2838,9 @@ async function init() {
     if (ctrl.mobileActive) return;
     ctrl.enabled = !!document.pointerLockElement;
     if (!ctrl.enabled) ctrl.resetInput();
-    UI.overlay.style.display = ctrl.enabled ? 'none' : 'flex';
+    UI.overlay.style.display = ctrl.enabled || liftDashboardOpen ? 'none' : 'flex';
   });
+  if (UI.liftCloseBtn) UI.liftCloseBtn.addEventListener('click', closeLiftDashboard);
   UI.floorSelect.addEventListener('change', (e) => {
     if (UI.floorSelectOverlay && UI.floorSelectOverlay.selectedIndex !== e.target.selectedIndex) {
       UI.floorSelectOverlay.selectedIndex = e.target.selectedIndex;
@@ -2790,18 +2870,7 @@ async function init() {
         })
         .sort((a, b) => a.d - b.d)[0];
       if (nearestLift && nearestLift.d < 3.5) {
-        nearestLift.l.openUntil = clock.elapsedTime + 3.0;
-        const fIdx = ALL_FLOORS.length - 1 - UI.floorSelect.selectedIndex;
-        const targetY = Math.max(0, fIdx) * SETTINGS.floorHeight + 1.3;
-        const targetLift = (world.lifts || [])
-          .map((l) => ({ l, dy: Math.abs(l.call.position.y - targetY) }))
-          .sort((a, b) => a.dy - b.dy)[0];
-        if (targetLift) {
-          ctrl.pos.x = targetLift.l.call.position.x;
-          ctrl.pos.z = targetLift.l.call.position.z;
-          targetLift.l.openUntil = clock.elapsedTime + 3.0;
-        }
-        ctrl.pos.y = Math.max(0, fIdx) * SETTINGS.floorHeight + SETTINGS.playerHeight;
+        enterLift(nearestLift.l);
         return;
       }
       raycaster.setFromCamera(new THREE.Vector2(), camera);
@@ -2814,18 +2883,7 @@ async function init() {
         }
         if (ud.type === 'lift') {
           const liftRef = (world.lifts || []).find((l) => l.call === hits[0].object);
-          if (liftRef) liftRef.openUntil = clock.elapsedTime + 3.0;
-          const fIdx = ALL_FLOORS.length - 1 - UI.floorSelect.selectedIndex;
-          const targetY = Math.max(0, fIdx) * SETTINGS.floorHeight + 1.3;
-          const targetLift = (world.lifts || [])
-            .map((l) => ({ l, dy: Math.abs(l.call.position.y - targetY) }))
-            .sort((a, b) => a.dy - b.dy)[0];
-          if (targetLift) {
-            ctrl.pos.x = targetLift.l.call.position.x;
-            ctrl.pos.z = targetLift.l.call.position.z;
-            targetLift.l.openUntil = clock.elapsedTime + 3.0;
-          }
-          ctrl.pos.y = Math.max(0, fIdx) * SETTINGS.floorHeight + SETTINGS.playerHeight;
+          if (liftRef) enterLift(liftRef);
           return;
         }
         if (ud.toggle) ud.toggle();

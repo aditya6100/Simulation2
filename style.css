@@ -71,6 +71,89 @@ canvas{
   border-radius: 2px;
 }
 
+#liftDashboard{
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.36);
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+#liftDashboard.active{
+  display: flex;
+}
+
+.lift-console{
+  width: min(360px, calc(100vw - 36px));
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background:
+    linear-gradient(145deg, rgba(22, 31, 42, 0.96), rgba(56, 65, 76, 0.96)),
+    linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  box-shadow: 0 28px 70px rgba(0,0,0,0.32);
+  padding: 18px;
+  color: #f8fafc;
+}
+
+.lift-console-screen{
+  min-height: 82px;
+  border-radius: 6px;
+  border: 1px solid rgba(20, 184, 166, 0.32);
+  background: #061b1f;
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  box-shadow: inset 0 0 24px rgba(20, 184, 166, 0.12);
+}
+
+.lift-console-screen span{
+  color: #5eead4;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lift-console-screen strong{
+  color: #f8fafc;
+  font-size: 24px;
+}
+
+.lift-buttons{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.lift-floor-btn,
+.lift-close-btn{
+  min-height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 232, 240, 0.24);
+  background: linear-gradient(180deg, #f8fafc, #cbd5e1);
+  color: #0f172a;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), 0 8px 16px rgba(0,0,0,0.18);
+}
+
+.lift-floor-btn.active{
+  color: #ffffff;
+  background: linear-gradient(180deg, #14b8a6, #0f766e);
+}
+
+.lift-close-btn{
+  width: 100%;
+  margin-top: 14px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.45);
+  color: #e2e8f0;
+}
+
 #ui{
   position: fixed;
   inset: 0;

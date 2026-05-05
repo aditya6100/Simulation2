@@ -35,7 +35,7 @@
       <div id="panel-right-top" class="panel">
         <div class="panel-title">Interactive Systems</div>
         <div class="panel-body">
-          <div><span class="k-btn">E</span> Interact / Use Doors</div>
+          <div><span class="k-btn">E</span> Interact / Lift Panel</div>
           <div><span class="k-btn">F</span> Tactical Flashlight</div>
           <div><span class="k-btn">R</span> Toggle Storm/Rain</div>
           <div><span class="k-btn">M</span> Emergency Lockdown</div>
@@ -124,6 +124,16 @@
     </div>
 
     <div id="crosshair"></div>
+    <div id="liftDashboard" aria-hidden="true">
+      <div class="lift-console">
+        <div class="lift-console-screen">
+          <span>Current Floor</span>
+          <strong id="liftCurrentFloor">4th Floor</strong>
+        </div>
+        <div id="liftButtons" class="lift-buttons" aria-label="Lift floor selection"></div>
+        <button id="liftCloseBtn" class="lift-close-btn" type="button">Exit Lift</button>
+      </div>
+    </div>
     <div id="mobileControls" aria-hidden="true">
       <div id="movePad" class="touch-zone"><div class="touch-stick"></div></div>
       <div id="lookPad" class="touch-zone"><div class="touch-stick"></div></div>
