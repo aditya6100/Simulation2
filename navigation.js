@@ -489,6 +489,20 @@ function updateLocationDropdowns() {
 
 // --- 7. 3D VISUALIZATION ---
 let scene, camera, renderer, pathGroup, floorGroup;
+let isARSessionActive = false;
+
+function resetFloorGroupTransform() {
+  if (!floorGroup) return;
+  floorGroup.position.set(0, 0, 0);
+  floorGroup.scale.setScalar(1);
+}
+
+function anchorRouteForAR() {
+  if (!floorGroup || !startPos) return;
+
+  floorGroup.scale.setScalar(1);
+  floorGroup.position.set(-startPos.x, -0.45, -startPos.z - 1.5);
+}
 
 function init3D() {
   scene = new THREE.Scene();
@@ -503,6 +517,19 @@ function init3D() {
   
   const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
   document.body.appendChild(arButton);
+
+  renderer.xr.addEventListener('sessionstart', () => {
+    isARSessionActive = true;
+    anchorRouteForAR();
+    UI.statusMsg.innerText = path.length > 1
+      ? 'AR route anchored. Follow the bright arrows in front of you.'
+      : 'Select a route before using AR navigation.';
+  });
+
+  renderer.xr.addEventListener('sessionend', () => {
+    isARSessionActive = false;
+    resetFloorGroupTransform();
+  });
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.8));
   const sun = new THREE.DirectionalLight(0xffffff, 0.5); sun.position.set(5, 10, 5); scene.add(sun);
@@ -519,6 +546,7 @@ function init3D() {
 }
 
 function update3DScene() {
+  resetFloorGroupTransform();
   while(floorGroup.children.length > 0) floorGroup.remove(floorGroup.children[0]);
   pathGroup = null;
   
@@ -543,10 +571,12 @@ function update3DScene() {
     floorGroup.add(box);
   });
   
-  if (startPos) {
+  if (startPos && !isARSessionActive) {
     camera.position.set(startPos.x, 30, startPos.z + 20);
     camera.lookAt(startPos.x, 0, startPos.z);
   }
+
+  if (isARSessionActive) anchorRouteForAR();
 }
 
 function visualizePath3D() {
@@ -554,23 +584,38 @@ function visualizePath3D() {
   if (path.length < 2) return;
   pathGroup = new THREE.Group();
   
-  const points = path.map(p => new THREE.Vector3(p.x, 0.2, p.z));
+  const points = path.map(p => new THREE.Vector3(p.x, 0.22, p.z));
   const curve = new THREE.CatmullRomCurve3(points);
-  const tubeGeo = new THREE.TubeGeometry(curve, path.length * 2, 0.1, 8, false);
-  const tubeMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.8 });
+  const tubeGeo = new THREE.TubeGeometry(curve, path.length * 2, 0.13, 10, false);
+  const tubeMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffcc,
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false
+  });
   pathGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
   
-  // Animated arrows or dashes
-  const arrowGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
-  const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+  const arrowGeo = new THREE.ConeGeometry(0.35, 0.85, 3);
+  const arrowMat = new THREE.MeshBasicMaterial({
+    color: 0xfff04a,
+    depthTest: false
+  });
+  const baseDirection = new THREE.Vector3(0, 1, 0);
   for(let i=1; i<path.length; i+=5) {
-    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-    arrow.position.set(path[i].x, 0.5, path[i].z);
     const next = path[Math.min(i+1, path.length-1)];
-    arrow.lookAt(next.x, 0.5, next.z); arrow.rotateX(Math.PI/2);
+    const direction = new THREE.Vector3(next.x - path[i].x, 0, next.z - path[i].z);
+    if (direction.lengthSq() === 0) continue;
+    direction.normalize();
+
+    const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+    arrow.position.set(path[i].x, 0.38, path[i].z);
+    arrow.quaternion.setFromUnitVectors(baseDirection, direction);
+    arrow.renderOrder = 10;
     pathGroup.add(arrow);
   }
   floorGroup.add(pathGroup);
+
+  if (isARSessionActive) anchorRouteForAR();
 }
 
 async function initNavigation() {
