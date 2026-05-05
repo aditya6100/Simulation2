@@ -906,6 +906,28 @@ function placeWindow(position, yaw, scale = new THREE.Vector3(1, 1, 1)) {
   addInstance('windowGlass', position, yaw, scale);
 }
 
+function placeSourceWindow(windowData, elev) {
+  const x = toWorld(windowData.x);
+  const z = toWorld(windowData.y);
+  const width = Math.max(0.75, toWorld(windowData.width || 165));
+  const height = Math.max(0.62, toWorld(windowData.height || 124));
+  const bottom = toWorld(windowData.elevation || 120);
+  const yaw = Number.isFinite(parseFloat(windowData.angle))
+    ? -parseFloat(windowData.angle || 0)
+    : -Math.atan2(toWorld(windowData.yEnd) - toWorld(windowData.yStart), toWorld(windowData.xEnd) - toWorld(windowData.xStart));
+  const scale = new THREE.Vector3(width / 1.65, height / 1.24, 1);
+  const normal = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  placeWindow(new THREE.Vector3(x + normal.x * 0.095, elev + bottom + height * 0.5, z + normal.z * 0.095), yaw, scale);
+}
+
+function addWindowsFromSourceData(windowsData, elev) {
+  (windowsData || []).forEach((windowData) => {
+    const name = String(windowData.name || windowData.catalogId || '').toLowerCase();
+    if (!name.includes('window')) return;
+    placeSourceWindow(windowData, elev);
+  });
+}
+
 function placeWindowRun(x1, z1, x2, z2, elev, count, options = {}) {
   const y = elev + (options.y ?? 1.50);
   const scale = options.scale || new THREE.Vector3(1, 1, 1);
@@ -1511,17 +1533,27 @@ function initInstancedMeshes(totalFloors) {
   createInstanced('basin', basinGeo, MATS.white, 100 * totalFloors);
 
   const windowFrameGeo = mergeGeometries([
-    new THREE.BoxGeometry(1.65, 0.07, 0.10).translate(0, 0.62, 0),
-    new THREE.BoxGeometry(1.65, 0.07, 0.10).translate(0, -0.62, 0),
-    new THREE.BoxGeometry(0.07, 1.24, 0.10).translate(0.79, 0, 0),
-    new THREE.BoxGeometry(0.07, 1.24, 0.10).translate(-0.79, 0, 0),
-    new THREE.BoxGeometry(0.045, 1.14, 0.08).translate(0, 0, 0.01),
-    new THREE.BoxGeometry(1.50, 0.035, 0.08).translate(0, 0, 0.012)
+    new THREE.BoxGeometry(1.72, 0.075, 0.12).translate(0, 0.64, 0),
+    new THREE.BoxGeometry(1.72, 0.075, 0.12).translate(0, -0.64, 0),
+    new THREE.BoxGeometry(0.075, 1.28, 0.12).translate(0.83, 0, 0),
+    new THREE.BoxGeometry(0.075, 1.28, 0.12).translate(-0.83, 0, 0),
+    new THREE.BoxGeometry(0.055, 1.18, 0.11).translate(0, 0, 0.025),
+    new THREE.BoxGeometry(1.56, 0.045, 0.11).translate(0, 0.03, 0.03),
+    new THREE.BoxGeometry(1.68, 0.035, 0.16).translate(0, -0.72, 0.055),
+    new THREE.BoxGeometry(1.68, 0.026, 0.12).translate(0, -0.55, 0.06),
+    new THREE.BoxGeometry(1.68, 0.026, 0.12).translate(0, 0.55, 0.06),
+    new THREE.BoxGeometry(0.035, 0.34, 0.08).translate(-0.20, -0.04, 0.105),
+    new THREE.BoxGeometry(0.035, 0.34, 0.08).translate(0.20, 0.04, 0.105)
   ]);
-  createInstanced('windowFrame', windowFrameGeo, MATS.windowFrame, 360 * totalFloors);
+  createInstanced('windowFrame', windowFrameGeo, MATS.windowFrame, 1200 * totalFloors);
 
-  const windowGlassGeo = new THREE.BoxGeometry(1.48, 1.08, 0.035).translate(0, 0, 0.015);
-  createInstanced('windowGlass', windowGlassGeo, MATS.windowGlass, 360 * totalFloors);
+  const windowGlassGeo = mergeGeometries([
+    new THREE.BoxGeometry(0.78, 1.03, 0.032).translate(-0.37, 0, 0.035),
+    new THREE.BoxGeometry(0.78, 1.03, 0.032).translate(0.37, 0, 0.072),
+    new THREE.BoxGeometry(0.66, 0.018, 0.01).translate(-0.37, 0.36, 0.095),
+    new THREE.BoxGeometry(0.66, 0.018, 0.01).translate(0.37, -0.30, 0.105)
+  ]);
+  createInstanced('windowGlass', windowGlassGeo, MATS.windowGlass, 1200 * totalFloors);
 
   const treeTrunkGeo = new THREE.CylinderGeometry(0.08, 0.11, 1.0, 8).translate(0, 0.5, 0);
   createInstanced('treeTrunk', treeTrunkGeo, new THREE.MeshStandardMaterial({ color: 0x5a3822, roughness: 0.8 }), 80);
@@ -1804,10 +1836,11 @@ async function loadWorld() {
       currentDir = SETTINGS.jsonDir + '/4thfloor';
     }
 
-    const [wD, dD, fD] = await Promise.all([
+    const [wD, dD, fD, winD] = await Promise.all([
       loadJson(currentDir + '/walls.json'),
       loadJson(currentDir + '/doors.json'),
-      loadJson(currentDir + '/furniture.json')
+      loadJson(currentDir + '/furniture.json'),
+      loadJson(currentDir + '/windows.json')
     ]);
     const floorNameplates = ALL_FLOORS[i] === 'groundgloor'
       ? buildGroundFloorDoorLabelMap(dD)
@@ -2604,8 +2637,7 @@ async function loadWorld() {
       dObj.add(hit); doorList.push(hit.userData); interactables.push(hit); scene.add(dObj);
     });
 
-    // Do not auto-place windows on copied wall segments. Real openings are driven
-    // by doors.json, including the main facade sliding entrance.
+    addWindowsFromSourceData(winD, elev);
     addExteriorWindowsForFloor(ALL_FLOORS[i], elev);
 
     if (!SETTINGS.performanceMode) {
