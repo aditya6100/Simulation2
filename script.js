@@ -71,6 +71,10 @@ const TEXTURE_CACHE = {};
 const INSTANCED_MESHES = {};
 let ROOM_LABELS = {};
 let minimapWorld = null;
+let flashlight = null;
+let stormSystem = null;
+let stormActive = false;
+let emergencyLockdown = false;
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -222,6 +226,92 @@ function drawSimulationMinimap() {
   ctx.fillStyle = '#0f172a';
   ctx.font = `${11 * dpr}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillText(FLOOR_LABELS[floorIdx], 10 * dpr, 17 * dpr);
+}
+
+function setupFlashlight() {
+  flashlight = new THREE.SpotLight(0xffffff, 0, 18, Math.PI / 7, 0.45, 1.25);
+  flashlight.position.set(0, -0.08, 0.12);
+  flashlight.target.position.set(0, -0.12, -1);
+  camera.add(flashlight);
+  camera.add(flashlight.target);
+}
+
+function toggleFlashlight() {
+  if (!flashlight) return;
+  flashlight.intensity = flashlight.intensity > 0 ? 0 : 3.2;
+}
+
+function setupStormSystem() {
+  const count = 900;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 42;
+    positions[i * 3 + 1] = Math.random() * 18;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 42;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({
+    color: 0x7dd3fc,
+    size: 0.045,
+    transparent: true,
+    opacity: 0.68,
+    depthWrite: false
+  });
+  const rain = new THREE.Points(geometry, material);
+  rain.visible = false;
+  rain.frustumCulled = false;
+  scene.add(rain);
+
+  const lightning = new THREE.DirectionalLight(0xbfdcff, 0);
+  lightning.position.set(-30, 70, 20);
+  scene.add(lightning);
+
+  stormSystem = { rain, lightning, defaultFogDensity: scene.fog.density, defaultBackground: scene.background.clone() };
+}
+
+function toggleStorm() {
+  if (!stormSystem) return;
+  stormActive = !stormActive;
+  stormSystem.rain.visible = stormActive;
+  scene.fog.density = stormActive ? 0.026 : stormSystem.defaultFogDensity;
+  scene.background = stormActive ? new THREE.Color(0x8fa7bd) : stormSystem.defaultBackground.clone();
+}
+
+function updateStorm(dt, t) {
+  if (!stormSystem) return;
+  stormSystem.lightning.intensity = Math.max(0, stormSystem.lightning.intensity - dt * 7);
+  if (!stormActive || !ctrl) return;
+
+  stormSystem.rain.position.set(ctrl.pos.x, ctrl.pos.y + 4, ctrl.pos.z);
+  const attr = stormSystem.rain.geometry.attributes.position;
+  for (let i = 0; i < attr.count; i++) {
+    let y = attr.getY(i) - dt * 16;
+    if (y < -1) y = 18;
+    attr.setY(i, y);
+  }
+  attr.needsUpdate = true;
+
+  if (Math.sin(t * 2.7) > 0.992) stormSystem.lightning.intensity = 1.7;
+}
+
+function activateEmergencyLockdown(world) {
+  emergencyLockdown = !emergencyLockdown;
+
+  if (emergencyLockdown) {
+    (world.doorList || []).forEach((door) => {
+      door.isOpen = false;
+      door.targetRot = 0;
+      if (door.colW) door.colW.active = true;
+      (door.sideBlockers || []).forEach((b) => { b.active = true; });
+    });
+    (world.autoDoors || []).forEach((door) => { door.openUntil = 0; });
+    (world.lifts || []).forEach((lift) => { lift.openUntil = 0; });
+    UI.zoneName.innerText = 'Emergency lockdown active';
+    return;
+  }
+
+  UI.zoneName.innerText = 'Emergency lockdown cleared';
 }
 const toNum = (v, def = 0) => { const n = parseFloat(v); return isNaN(n) ? def : n; };
 
@@ -2691,6 +2781,8 @@ async function init() {
   if (!SETTINGS.performanceMode) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+  scene.add(camera);
+  setupFlashlight();
   scene.add(new THREE.AmbientLight(0xffffff, SETTINGS.performanceMode ? 0.8 : 0.6));
   const sun = new THREE.DirectionalLight(0xfff5e6, SETTINGS.performanceMode ? 1.0 : 1.2);
   sun.position.set(100, 200, 50);
@@ -2708,6 +2800,7 @@ async function init() {
   const world = await loadWorld();
   minimapWorld = world;
   addOutdoorEnvironment();
+  setupStormSystem();
   if (UI.qualitySelect) {
     applyQualityProfile(UI.qualitySelect.value);
     UI.qualitySelect.addEventListener('change', (e) => applyQualityProfile(e.target.value));
@@ -2755,8 +2848,9 @@ async function init() {
     });
   }
   window.addEventListener('keydown', e=>{
+    if (e.repeat) return;
     if(e.code === 'KeyE') {
-      const nearestLift = (world.lifts || [])
+      const nearestLift = emergencyLockdown ? null : (world.lifts || [])
         .map((l) => {
           const dCall = ctrl ? ctrl.pos.distanceTo(l.call.position) : 999;
           const dDoor = (ctrl && l.center) ? ctrl.pos.distanceTo(l.center) : 999;
@@ -2782,6 +2876,10 @@ async function init() {
       const hits = raycaster.intersectObjects(world.interactables);
       if(hits.length > 0 && hits[0].distance < 3) {
         const ud = hits[0].object.userData || {};
+        if (emergencyLockdown && ud.type === 'door') {
+          UI.zoneName.innerText = 'Door locked by emergency lockdown';
+          return;
+        }
         if (ud.type === 'lift') {
           const liftRef = (world.lifts || []).find((l) => l.call === hits[0].object);
           if (liftRef) liftRef.openUntil = clock.elapsedTime + 3.0;
@@ -2803,6 +2901,13 @@ async function init() {
     }
   });
   window.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    if (e.code === 'KeyF') {
+      toggleFlashlight();
+    }
+    if (e.code === 'KeyR') {
+      toggleStorm();
+    }
     if (e.code === 'KeyU') {
       const floorFromY = Math.round((ctrl.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight);
       const targetY = floorFromY * SETTINGS.floorHeight + SETTINGS.playerHeight;
@@ -2817,9 +2922,7 @@ async function init() {
       }
     }
     if (e.code === 'KeyM') {
-      const safe2 = world.floorSafeSpawns[2] || new THREE.Vector3(48.0, 2 * SETTINGS.floorHeight + SETTINGS.playerHeight, 6.0);
-      ctrl.pos.set(safe2.x, 2 * SETTINGS.floorHeight + SETTINGS.playerHeight, safe2.z);
-      console.log('Moved to 2nd floor main corridor');
+      activateEmergencyLockdown(world);
     }
   });
   window.addEventListener('resize', () => drawSimulationMinimap());
@@ -2835,7 +2938,7 @@ async function init() {
     (world.autoDoors || []).forEach(ad => {
       if (ad.kind !== 'slidingEntrance') return;
       const dist = ctrl ? ctrl.pos.distanceTo(ad.pos) : 999;
-      if (dist < 2.6) ad.openUntil = t + 3.0;
+      if (!emergencyLockdown && dist < 2.6) ad.openUntil = t + 3.0;
       ad.targetOpen = t < ad.openUntil ? 1 : 0;
       ad.openAmount += (ad.targetOpen - ad.openAmount) * Math.min(1, dt * 6.5);
 
@@ -2852,7 +2955,7 @@ async function init() {
       const nearCall = ctrl ? ctrl.pos.distanceTo(lf.call.position) < 2.4 : false;
       const nearDoor = (ctrl && lf.center) ? ctrl.pos.distanceTo(lf.center) < 2.4 : false;
       const near = nearCall || nearDoor;
-      if (near) lf.openUntil = Math.max(lf.openUntil, t + 0.6);
+      if (!emergencyLockdown && near) lf.openUntil = Math.max(lf.openUntil, t + 0.6);
       const targetOpen = t < lf.openUntil ? 1 : 0;
       lf.openAmount += (targetOpen - lf.openAmount) * Math.min(1, dt * 5.0);
       const slide = lf.maxSlide * lf.openAmount;
@@ -2860,6 +2963,7 @@ async function init() {
       lf.right.position.z = lf.baseRightZ + slide;
     });
 
+    updateStorm(dt, t);
     drawSimulationMinimap();
     renderer.render(scene, camera);
   }
