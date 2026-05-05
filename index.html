@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>College Lab Simulation Pro</title>
-    <link rel="stylesheet" href="./style.css?v=20260501-mobile" />
+    <link rel="stylesheet" href="./style.css?v=20260504-welcome" />
     <link rel="icon" href="data:," />
     <script type="importmap">
       {
@@ -26,6 +26,9 @@
           <div><span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> Walk</div>
           <div><span class="k">Shift</span> Sprint</div>
           <div><span class="k">Esc</span> Menu</div>
+          <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+            <a href="navigation.html" style="color: #00ffcc; text-decoration: none; font-weight: bold; font-size: 14px;">&rarr; AR Navigation</a>
+          </div>
         </div>
       </div>
 
@@ -62,25 +65,57 @@
         <div class="panel-title">Current Zone</div>
         <div class="panel-body" id="zoneName" style="color:#00ffcc; font-size:1.2em;">Main Corridor</div>
       </div>
+
+      <div id="minimap-container" style="position: absolute; bottom: 14px; right: 14px; width: 200px; height: 200px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; overflow: hidden; pointer-events: auto; backdrop-filter: blur(8px);">
+        <canvas id="minimap-canvas" style="width: 100%; height: 100%;"></canvas>
+      </div>
     </div>
 
     <div id="overlay">
       <div class="overlay-card">
-        <div class="overlay-title">College Lab Simulation</div>
-        <div class="overlay-sub">Ultra-Realistic Environment Engine</div>
-        <div class="overlay-floor">
-          <label for="floorSelectOverlay">Start Floor</label>
-          <select id="floorSelectOverlay">
-            <option value="5thfloor">5th Floor</option>
-            <option value="4thfloor" selected>4th Floor - Labs</option>
-            <option value="3rdfloor">3rd Floor</option>
-            <option value="2ndfloor">2nd Floor</option>
-            <option value="1stfloor">1st Floor</option>
-            <option value="groundgloor">Ground Floor</option>
-          </select>
+        <div class="welcome-copy">
+          <div class="welcome-kicker">Interactive Campus Walkthrough</div>
+          <h1 class="overlay-title">Welcome to College Lab Simulation</h1>
+          <p class="overlay-sub">Explore the building floor by floor in a real-time 3D navigation experience.</p>
+
+          <div class="welcome-highlights" aria-label="Simulation highlights">
+            <span>6 Floors</span>
+            <span>Room Labels</span>
+            <span>Mobile Ready</span>
+          </div>
+
+          <div class="welcome-controls" aria-label="Quick controls">
+            <div><span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span> Move</div>
+            <div><span class="k-btn">E</span> Interact</div>
+            <div><span class="k-btn">F</span> Flashlight</div>
+          </div>
+
+          <div class="overlay-floor">
+            <label for="floorSelectOverlay">Choose Start Floor</label>
+            <select id="floorSelectOverlay">
+              <option value="5thfloor">5th Floor</option>
+              <option value="4thfloor" selected>4th Floor - Labs</option>
+              <option value="3rdfloor">3rd Floor</option>
+              <option value="2ndfloor">2nd Floor</option>
+              <option value="1stfloor">1st Floor</option>
+              <option value="groundgloor">Ground Floor</option>
+            </select>
+          </div>
+
+          <button id="startBtn" type="button">Enter Simulation</button>
+          <div style="margin-top: 15px;">
+            <a href="navigation.html" style="color: #00ffcc; text-decoration: none; font-weight: bold; font-size: 16px; border: 1px solid #00ffcc; padding: 10px 20px; border-radius: 6px; display: inline-block;">&rarr; Go to AR Navigation</a>
+          </div>
+          <div class="overlay-hint">Audio, physics, and controls initialize after you enter.</div>
         </div>
-        <button id="startBtn" type="button">INITIALIZE SYSTEMS</button>
-        <div class="overlay-hint">Audio and Physics will initialize on start.</div>
+
+        <div class="welcome-visual" aria-hidden="true">
+          <img src="./2ndfloorcse.png" alt="" />
+          <div class="welcome-visual-label">
+            <span>Live 3D Floor Explorer</span>
+            <strong>Navigate labs, corridors, and classrooms</strong>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -90,6 +125,6 @@
       <div id="lookPad" class="touch-zone"><div class="touch-stick"></div></div>
       <button id="mobileInteract" class="touch-action-btn" type="button">E</button>
     </div>
-    <script type="module" src="./script.js?v=20260501-mobile"></script>
+    <script type="module" src="./script.js?v=20260504-welcome"></script>
   </body>
 </html>

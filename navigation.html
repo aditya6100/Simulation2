@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Campus AR Navigation</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.167.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.167.1/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      #minimap-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 250px;
+        height: 250px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid #00ffcc;
+        border-radius: 10px;
+        overflow: hidden;
+        z-index: 100;
+        pointer-events: auto;
+      }
+      #minimap-canvas {
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+      }
+      #nav-ui {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 300px;
+        background: rgba(12, 16, 22, 0.8);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 10px;
+        padding: 15px;
+        z-index: 101;
+        pointer-events: auto;
+      }
+      .nav-field {
+        margin-bottom: 10px;
+      }
+      .nav-field label {
+        display: block;
+        font-size: 12px;
+        color: #00ffcc;
+        margin-bottom: 4px;
+      }
+      .nav-field select, .nav-field input {
+        width: 100%;
+        background: #111;
+        color: white;
+        border: 1px solid #333;
+        padding: 8px;
+        border-radius: 4px;
+      }
+      #go-btn {
+        width: 100%;
+        background: #00ffcc;
+        color: #000;
+        border: none;
+        padding: 10px;
+        font-weight: bold;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #go-btn:hover {
+        background: #00d6ad;
+      }
+      .pick-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .pick-btn {
+        min-height: 34px;
+        background: rgba(255,255,255,0.08);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .pick-btn.active {
+        background: rgba(0,255,204,0.18);
+        border-color: #00ffcc;
+        color: #00ffcc;
+      }
+      #status-msg {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #fff;
+      }
+      #ar-btn {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        background: #00ffcc;
+        color: #000;
+        border: none;
+        border-radius: 30px;
+        font-weight: bold;
+        z-index: 102;
+        display: none;
+      }
+      .back-btn {
+        display: inline-block;
+        margin-bottom: 15px;
+        color: #00ffcc;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .legend {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        font-size: 12px;
+        color: rgba(255,255,255,0.78);
+      }
+      .legend span::before {
+        content: "";
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
+      .legend .start::before { background: #20e06b; }
+      .legend .dest::before { background: #ff3b5f; }
+      .legend .route::before { background: #00ffcc; border-radius: 2px; }
+      @media (max-width: 760px) {
+        #nav-ui {
+          left: 10px;
+          right: 10px;
+          top: 10px;
+          width: auto;
+        }
+        #minimap-container {
+          right: 10px;
+          bottom: 10px;
+          width: min(46vw, 210px);
+          height: min(46vw, 210px);
+        }
+        #ar-btn {
+          bottom: 230px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="nav-ui">
+      <a href="index.html" class="back-btn">&larr; Back to Simulation</a>
+      <div class="panel-title">Navigation System</div>
+      
+      <div class="nav-field">
+        <label>Current Floor</label>
+        <select id="floorSelect">
+          <option value="5thfloor">5th Floor</option>
+          <option value="4thfloor" selected>4th Floor - Labs</option>
+          <option value="3rdfloor">3rd Floor</option>
+          <option value="2ndfloor">2nd Floor</option>
+          <option value="1stfloor">1st Floor</option>
+          <option value="groundgloor">Ground Floor</option>
+        </select>
+      </div>
+
+      <div class="nav-field">
+        <label for="startSelect">Current Location</label>
+        <select id="startSelect">
+          <option value="">Select Current Location</option>
+        </select>
+      </div>
+
+      <div class="nav-field">
+        <label for="destSelect">Where You Want To Go</label>
+        <select id="destSelect">
+          <option value="">Select Destination</option>
+        </select>
+      </div>
+
+      <div class="pick-row">
+        <button id="pick-start-btn" class="pick-btn active" type="button">Pick Current</button>
+        <button id="pick-dest-btn" class="pick-btn" type="button">Pick Destination</button>
+      </div>
+
+      <button id="go-btn">Start Navigation</button>
+      <div id="status-msg">Select start and end points on the map.</div>
+      <div class="legend" aria-label="Map legend">
+        <span class="start">Current</span>
+        <span class="dest">Destination</span>
+        <span class="route">Route</span>
+      </div>
+    </div>
+
+    <div id="minimap-container">
+      <canvas id="minimap-canvas"></canvas>
+    </div>
+
+    <button id="ar-btn">Enter AR View</button>
+
+    <div id="crosshair"></div>
+    <script type="module" src="./navigation.js"></script>
+  </body>
+</html>

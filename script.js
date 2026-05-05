@@ -1613,6 +1613,7 @@ async function loadWorld() {
   initInstancedMeshes(ALL_FLOORS.length);
   const wallGeos = []; const skirtGeos = []; const corridorBaseGeos = []; const corridorGlassGeos = []; const corridorFrameGeos = [];
   const doorList = []; const interactables = []; const autoDoors = []; const lifts = [];
+  const floorDataMap = new Map();
   let spawnPoint = new THREE.Vector3(50.0, SETTINGS.playerHeight, 0.0);
   let secondFloorSpawn = null;
   const floorSafeSpawns = [];
