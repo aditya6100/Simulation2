@@ -37,7 +37,7 @@ const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || naviga
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
-const ENABLE_LIFT = true;
+const ENABLE_LIFT = false;
 const SMART_BOARD_PLACEMENTS = {
   groundgloor: {
     'CLASSROOM G001': { x: 43.33, z: 6.48, yaw: 0 },
@@ -475,62 +475,6 @@ function createTextTexture(text) {
   return tex;
 }
 
-function createNoticeTexture(title, notices) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 640;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#8a5a2b';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#9f6b36';
-  for (let i = 0; i < 120; i++) {
-    ctx.globalAlpha = 0.08;
-    ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 90 + 20, 2);
-  }
-  ctx.globalAlpha = 1;
-
-  ctx.fillStyle = '#18222f';
-  ctx.fillRect(26, 22, 972, 82);
-  ctx.fillStyle = '#f8fafc';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = '800 44px Arial, sans-serif';
-  ctx.fillText(String(title || 'NOTICE BOARD').toUpperCase(), canvas.width / 2, 64);
-
-  const paperSpecs = [
-    { x: 62, y: 142, w: 400, h: 178, color: '#fff8dc' },
-    { x: 560, y: 136, w: 372, h: 164, color: '#edf6ff' },
-    { x: 72, y: 372, w: 360, h: 150, color: '#f7f1ff' },
-    { x: 536, y: 356, w: 406, h: 182, color: '#f0fff4' }
-  ];
-
-  paperSpecs.forEach((paper, idx) => {
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(paper.x + 8, paper.y + 10, paper.w, paper.h);
-    ctx.fillStyle = paper.color;
-    ctx.fillRect(paper.x, paper.y, paper.w, paper.h);
-    ctx.fillStyle = '#cc2b2b';
-    ctx.beginPath();
-    ctx.arc(paper.x + paper.w / 2, paper.y + 16, 8, 0, Math.PI * 2);
-    ctx.fill();
-
-    const text = notices[idx] || '';
-    const lines = String(text).split('\n');
-    ctx.fillStyle = '#17212c';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = '700 27px Arial, sans-serif';
-    lines.forEach((line, lineIdx) => {
-      ctx.fillText(line, paper.x + 28, paper.y + 42 + lineIdx * 38);
-    });
-  });
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.anisotropy = 4;
-  return tex;
-}
-
 function addSignBoard(text, position, yaw, width = 1.25, height = 0.28, bgColor = 0x1f2933) {
   const group = new THREE.Group();
   group.position.copy(position);
@@ -551,48 +495,6 @@ function addSignBoard(text, position, yaw, width = 1.25, height = 0.28, bgColor 
 
   scene.add(group);
   return group;
-}
-
-function addNoticeBoard(title, notices, position, yaw) {
-  const group = new THREE.Group();
-  group.position.copy(position);
-  group.rotation.y = yaw;
-
-  const width = 2.35;
-  const height = 1.25;
-  const board = new THREE.Mesh(
-    new THREE.BoxGeometry(width, height, 0.055),
-    new THREE.MeshStandardMaterial({ color: 0x3b2a1c, roughness: 0.58, metalness: 0.08 })
-  );
-  group.add(board);
-
-  const cork = new THREE.Mesh(
-    new THREE.PlaneGeometry(width - 0.16, height - 0.14),
-    new THREE.MeshStandardMaterial({
-      map: createNoticeTexture(title, notices),
-      roughness: 0.72,
-      metalness: 0.02
-    })
-  );
-  cork.position.z = 0.031;
-  group.add(cork);
-
-  scene.add(group);
-  return group;
-}
-
-function addFloorNoticeBoards(floorIndex, floorKey, elev, walls) {
-  if (floorKey === '2ndfloor') return;
-  const floorLabel = FLOOR_LABELS[floorIndex] || 'Floor';
-  const commonNotices = [
-    'MID SEM NOTICE\nCheck timetable\non department portal',
-    'ATTENDANCE\nMinimum 75 percent\nattendance required',
-    'PLACEMENT CELL\nResume verification\nFriday 3:00 PM',
-    'LIBRARY REMINDER\nReturn issued books\nbefore month end'
-  ];
-  const boardY = elev + 1.75;
-  const entranceWall = snapSmartBoardToWall(new THREE.Vector3(49.43, boardY, 12.2), -Math.PI / 2, walls, 2.5);
-  addNoticeBoard(`${floorLabel} Notices`, commonNotices, entranceWall.position, entranceWall.yaw);
 }
 
 function applyQualityProfile(mode) {
@@ -2053,8 +1955,6 @@ async function loadWorld() {
           addSignBoard('WASHROOMS', new THREE.Vector3(p.x, elev + 2.25, p.z), -Math.PI / 2, 1.1, 0x2c2b23);
         }
       }
-
-        addFloorNoticeBoards(i, ALL_FLOORS[i], elev, wD);
 
         if (isGround) {
         const lobbyLightA = new THREE.PointLight(0xfff3dc, 0.55, 7.5);
