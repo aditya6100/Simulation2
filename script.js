@@ -37,7 +37,7 @@ const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || naviga
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
-const ENABLE_LIFT = false;
+const ENABLE_LIFT = true;
 const SMART_BOARD_PLACEMENTS = {
   groundgloor: {
     'CLASSROOM G001': { x: 43.33, z: 6.48, yaw: 0 },
