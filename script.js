@@ -81,6 +81,8 @@ let stormActive = false;
 let emergencyLockdown = false;
 let activeLift = null;
 let liftDashboardOpen = false;
+let liftEntryInProgress = false;
+let liftEntryTimer = null;
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -326,14 +328,33 @@ function getCurrentFloorIndex() {
 }
 
 function enterLift(lift) {
-  if (!ctrl || !lift || emergencyLockdown) return;
+  if (!ctrl || !lift || emergencyLockdown || liftDashboardOpen || liftEntryInProgress) return;
   activeLift = lift;
   const floorIdx = getCurrentFloorIndex();
-  ctrl.pos.set(lift.cabin.x, floorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight, lift.cabin.z);
-  ctrl.yaw = lift.yaw;
-  ctrl.pitch = 0;
-  lift.openUntil = clock.elapsedTime + 1.2;
-  openLiftDashboard(floorIdx);
+  liftEntryInProgress = true;
+  ctrl.enabled = false;
+  ctrl.resetInput();
+  lift.openUntil = clock.elapsedTime + 2.0;
+  UI.zoneName.innerText = 'Lift opening';
+
+  if (liftEntryTimer) clearTimeout(liftEntryTimer);
+  liftEntryTimer = setTimeout(() => {
+    if (!ctrl || emergencyLockdown || activeLift !== lift) {
+      liftEntryInProgress = false;
+      liftEntryTimer = null;
+      activeLift = null;
+      if (ctrl && !liftDashboardOpen) ctrl.enabled = true;
+      return;
+    }
+    ctrl.pos.set(lift.cabin.x, floorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight, lift.cabin.z);
+    ctrl.yaw = lift.yaw;
+    ctrl.pitch = 0;
+    lift.openUntil = clock.elapsedTime + 1.6;
+    UI.zoneName.innerText = 'Inside lift';
+    liftEntryInProgress = false;
+    liftEntryTimer = null;
+    openLiftDashboard(floorIdx);
+  }, 900);
 }
 
 function openLiftDashboard(currentFloorIdx) {
@@ -363,6 +384,11 @@ function openLiftDashboard(currentFloorIdx) {
 function closeLiftDashboard() {
   liftDashboardOpen = false;
   activeLift = null;
+  liftEntryInProgress = false;
+  if (liftEntryTimer) {
+    clearTimeout(liftEntryTimer);
+    liftEntryTimer = null;
+  }
   if (UI.liftDashboard) {
     UI.liftDashboard.classList.remove('active');
     UI.liftDashboard.setAttribute('aria-hidden', 'true');
@@ -1984,51 +2010,7 @@ async function loadWorld() {
       doorRight.castShadow = true;
       scene.add(doorLeft, doorRight);
 
-      const hideSecondFloorWallArtifacts = ALL_FLOORS[i] === '2ndfloor';
-      if (!hideSecondFloorWallArtifacts) {
-        const floorDisplay = new THREE.Mesh(
-          new THREE.BoxGeometry(0.05, 0.22, 0.7),
-          new THREE.MeshStandardMaterial({ color: 0x17212c, emissive: 0x2e7fff, emissiveIntensity: 0.7 })
-        );
-        {
-          const p = rot180(liftX + 0.6, liftZ);
-          floorDisplay.position.set(p.x, elev + 2.48, p.z);
-        }
-        scene.add(floorDisplay);
-
-        const callPanel = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.42, 0.16),
-          new THREE.MeshStandardMaterial({ color: 0x6f7780, roughness: 0.22, metalness: 0.85 })
-        );
-        {
-          const p = rot180(liftX + 0.63, liftZ + 1.0);
-          callPanel.position.set(p.x, elev + 1.22, p.z);
-        }
-        scene.add(callPanel);
-        const callLight = new THREE.PointLight(0x6eb7ff, 0.6, 4.0);
-        {
-          const p = rot180(liftX + 0.55, liftZ + 1.0);
-          callLight.position.set(p.x, elev + 1.25, p.z);
-        }
-        scene.add(callLight);
-
-        {
-          const p = rot180(liftX + 0.92, liftZ);
-          addSignBoard(FLOOR_LABELS[i].toUpperCase(), new THREE.Vector3(p.x, elev + 2.75, p.z), -Math.PI / 2, 1.25, 0.24, 0x17212c);
-        }
-        {
-          const p = rot180(liftX + 0.95, liftZ + 1.12);
-          addSignBoard('LIFT: G 1 2 3 4 5', new THREE.Vector3(p.x, elev + 1.7, p.z), -Math.PI / 2, 1.25, 0.22, 0x26313d);
-        }
-        {
-          const p = rot180(liftX + 1.05, liftZ - 1.25);
-          addSignBoard('LABS / CLASSROOMS', new THREE.Vector3(p.x, elev + 2.25, p.z), -Math.PI / 2, 1.45, 0.24, 0x203024);
-        }
-        {
-          const p = rot180(liftX + 1.05, liftZ + 1.45);
-          addSignBoard('WASHROOMS', new THREE.Vector3(p.x, elev + 2.25, p.z), -Math.PI / 2, 1.1, 0x2c2b23);
-        }
-      }
+      // Lift-side floor display and call board removed; the invisible hitbox below remains interactive.
 
         if (isGround) {
         const lobbyLightA = new THREE.PointLight(0xfff3dc, 0.55, 7.5);
@@ -2491,38 +2473,7 @@ async function loadWorld() {
 
       const plateText = floorNameplates.get(dIndex);
       if (plateText) {
-        const plateW = plateText === 'MEETING ROOM' ? 1.25 : 0.90;
-        const plateH = 0.22;
-        const plateD = 0.025;
-        const plateBottomY = 2.15; // 215 cm from floor (standard corridor signage)
-        const corridorCenter = new THREE.Vector2(48.5, 7.5);
-        const dx = corridorCenter.x - x;
-        const dz = corridorCenter.y - z;
-        // Convert corridor direction to door-local space to decide corridor-side wall face.
-        const localCorridorZ = Math.sin(ang) * dx + Math.cos(ang) * dz;
-        const sideSign = localCorridorZ >= 0 ? 1 : -1;
-
-        const plate = new THREE.Mesh(
-          new THREE.BoxGeometry(plateW, plateH, plateD),
-          new THREE.MeshStandardMaterial({ color: 0x1f2933, roughness: 0.45, metalness: 0.2 })
-        );
-        // Mount flush above door center, slightly protruding from corridor-side wall face.
-        const wallHalf = 0.25 / 2;
-        const casingExtra = 0.04 / 2;
-        const mountOffset = wallHalf + casingExtra + plateD / 2 + 0.005;
-        plate.position.set(0, plateBottomY + plateH / 2, sideSign * mountOffset);
-        // Keep board parallel to wall and face corridor side.
-        plate.rotation.y = sideSign > 0 ? 0 : Math.PI;
-
-        const tex = createTextTexture(plateText);
-        const textMatFront = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-        const textPlaneFront = new THREE.Mesh(new THREE.PlaneGeometry(plateW - 0.06, plateH - 0.05), textMatFront);
-        textPlaneFront.position.set(0, 0, plateD / 2 + 0.002);
-        plate.add(textPlaneFront);
-
-        dObj.add(plate);
-
-        // Smart boards for selected classrooms only.
+        // Visual corridor nameplates/boards are removed; labels still drive selected classroom smart boards.
         const needsClassroomSmartBoard =
           (ALL_FLOORS[i] === 'groundgloor' && /^CLASSROOM G00[4-5]$/.test(plateText)) ||
           (ALL_FLOORS[i] === '3rdfloor' && /^CLASSROOM 30[1-6]$/.test(plateText)) ||
