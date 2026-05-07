@@ -799,17 +799,17 @@ function addLabChartsForFloor(floorKey, elev) {
 
   const leftZ = [21.2, 12.4, 3.4, -9.6];
   const rightZ = [8.5, 0.0, -5.0];
-  const leftRoomWallX = 46.70;
-  const rightRoomWallX = 49.56;
+  const leftRoomWallX = 43.25;
+  const rightRoomWallX = 53.35;
 
   leftZ.forEach((z, idx) => {
     const data = charts[idx % charts.length];
-    addWallChart(data[0], data[1], new THREE.Vector3(leftRoomWallX, elev + 1.72, z), -Math.PI / 2, { accent: data[2] });
+    addWallChart(data[0], data[1], new THREE.Vector3(leftRoomWallX, elev + 1.72, z), Math.PI / 2, { accent: data[2] });
   });
 
   rightZ.forEach((z, idx) => {
     const data = charts[(idx + 1) % charts.length];
-    addWallChart(data[0], data[1], new THREE.Vector3(rightRoomWallX, elev + 1.72, z), Math.PI / 2, { accent: data[2] });
+    addWallChart(data[0], data[1], new THREE.Vector3(rightRoomWallX, elev + 1.72, z), -Math.PI / 2, { accent: data[2] });
   });
 }
 
