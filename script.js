@@ -605,6 +605,30 @@ function getDoorNameplateWidth(text) {
   return 1.05;
 }
 
+function addDoorJambBlockers(x, z, w, ang, yMin, yMax, options = {}) {
+  const length = options.length ?? 0.76;
+  const half = options.half ?? 0.13;
+  const inset = options.inset ?? 0.02;
+  return [-1, 1].map((side) => {
+    const sx = x + Math.cos(ang) * side * (w / 2 - inset);
+    const sz = z - Math.sin(ang) * side * (w / 2 - inset);
+    const blocker = {
+      x1: sx - Math.sin(ang) * length / 2,
+      z1: sz - Math.cos(ang) * length / 2,
+      x2: sx + Math.sin(ang) * length / 2,
+      z2: sz + Math.cos(ang) * length / 2,
+      half,
+      yMin,
+      yMax,
+      active: true,
+      isDoor: true,
+      fixedJamb: true
+    };
+    GLOBAL_COLLISION.walls.push(blocker);
+    return blocker;
+  });
+}
+
 function applyQualityProfile(mode) {
   if (!renderer) return;
   const quality = mode || 'performance';
@@ -2341,24 +2365,9 @@ async function loadWorld() {
 
         const colW = { x1: x - Math.cos(ang)*w/2, z1: z + Math.sin(ang)*w/2, x2: x + Math.cos(ang)*w/2, z2: z - Math.sin(ang)*w/2, half: 0.12, yMin: elev, yMax: elev+doorH, active: true, isDoor: true };
         GLOBAL_COLLISION.walls.push(colW);
-        const sideBlockerLen = 0.36;
-        const sideBlockerInset = 0.03;
-        const sideBlockers = [-1, 1].map((side) => {
-          const sx = x + Math.cos(ang) * side * (w / 2 - sideBlockerInset);
-          const sz = z - Math.sin(ang) * side * (w / 2 - sideBlockerInset);
-          const blocker = {
-            x1: sx - Math.sin(ang) * sideBlockerLen / 2,
-            z1: sz - Math.cos(ang) * sideBlockerLen / 2,
-            x2: sx + Math.sin(ang) * sideBlockerLen / 2,
-            z2: sz + Math.cos(ang) * sideBlockerLen / 2,
-            half: 0.1,
-            yMin: elev - 0.05,
-            yMax: elev + doorH + 0.05,
-            active: true,
-            isDoor: true
-          };
-          GLOBAL_COLLISION.walls.push(blocker);
-          return blocker;
+        const sideBlockers = addDoorJambBlockers(x, z, w, ang, elev - 0.05, elev + doorH + 0.05, {
+          length: 0.82,
+          half: 0.14
         });
         autoDoors.push({
           kind: 'slidingEntrance',
@@ -2445,25 +2454,7 @@ async function loadWorld() {
       const hit = new THREE.Mesh(new THREE.BoxGeometry(w+0.2, h, 0.4), new THREE.MeshBasicMaterial({visible:false})); hit.position.y = h/2;
       const colW = { x1: x - Math.cos(ang)*w/2, z1: z + Math.sin(ang)*w/2, x2: x + Math.cos(ang)*w/2, z2: z - Math.sin(ang)*w/2, half: 0.1, yMin: elev, yMax: elev+h, active: true, isDoor: true };
       GLOBAL_COLLISION.walls.push(colW);
-      const sideBlockerLen = 0.34;
-      const sideBlockerInset = 0.03;
-      const sideBlockers = [-1, 1].map((side) => {
-        const sx = x + Math.cos(ang) * side * (w / 2 - sideBlockerInset);
-        const sz = z - Math.sin(ang) * side * (w / 2 - sideBlockerInset);
-        const blocker = {
-          x1: sx - Math.sin(ang) * sideBlockerLen / 2,
-          z1: sz - Math.cos(ang) * sideBlockerLen / 2,
-          x2: sx + Math.sin(ang) * sideBlockerLen / 2,
-          z2: sz + Math.cos(ang) * sideBlockerLen / 2,
-          half: 0.09,
-          yMin: elev - 0.05,
-          yMax: elev + h + 0.05,
-          active: true,
-          isDoor: true
-        };
-        GLOBAL_COLLISION.walls.push(blocker);
-        return blocker;
-      });
+      const sideBlockers = addDoorJambBlockers(x, z, w, ang, elev - 0.05, elev + h + 0.05);
       hit.userData = {
         type:'door',
         isOpen:false,
@@ -2474,7 +2465,7 @@ async function loadWorld() {
           this.isOpen=!this.isOpen;
           this.targetRot=this.isOpen?Math.PI*0.6:0;
           this.colW.active=!this.isOpen;
-          this.sideBlockers.forEach((b) => { b.active = !this.isOpen; });
+          this.sideBlockers.forEach((b) => { b.active = true; });
         },
         pivot: piv
       };
@@ -2931,9 +2922,9 @@ async function init() {
       ad.leftShutter.position.x = ad.leftBaseX - slide;
       ad.rightShutter.position.x = ad.rightBaseX + slide;
 
-      // Collision: block when closed, open when sufficiently open
+      // Collision: open only the center slab; fixed jamb blockers stay active.
       ad.colW.active = ad.openAmount < 0.25;
-      (ad.sideBlockers || []).forEach((b) => { b.active = ad.openAmount < 0.25; });
+      (ad.sideBlockers || []).forEach((b) => { b.active = true; });
     });
 
     (world.lifts || []).forEach((lf) => {
