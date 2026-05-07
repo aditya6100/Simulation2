@@ -2473,7 +2473,38 @@ async function loadWorld() {
 
       const plateText = floorNameplates.get(dIndex);
       if (plateText) {
-        // Visual corridor nameplates/boards are removed; labels still drive selected classroom smart boards.
+        const plateW = plateText === 'MEETING ROOM' ? 1.25 : 0.90;
+        const plateH = 0.22;
+        const plateD = 0.025;
+        const plateBottomY = 2.15; // 215 cm from floor (standard corridor signage)
+        const corridorCenter = new THREE.Vector2(48.5, 7.5);
+        const dx = corridorCenter.x - x;
+        const dz = corridorCenter.y - z;
+        // Convert corridor direction to door-local space to decide corridor-side wall face.
+        const localCorridorZ = Math.sin(ang) * dx + Math.cos(ang) * dz;
+        const sideSign = localCorridorZ >= 0 ? 1 : -1;
+
+        const plate = new THREE.Mesh(
+          new THREE.BoxGeometry(plateW, plateH, plateD),
+          new THREE.MeshStandardMaterial({ color: 0x1f2933, roughness: 0.45, metalness: 0.2 })
+        );
+        // Mount flush above door center, slightly protruding from corridor-side wall face.
+        const wallHalf = 0.25 / 2;
+        const casingExtra = 0.04 / 2;
+        const mountOffset = wallHalf + casingExtra + plateD / 2 + 0.005;
+        plate.position.set(0, plateBottomY + plateH / 2, sideSign * mountOffset);
+        // Keep board parallel to wall and face corridor side.
+        plate.rotation.y = sideSign > 0 ? 0 : Math.PI;
+
+        const tex = createTextTexture(plateText);
+        const textMatFront = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+        const textPlaneFront = new THREE.Mesh(new THREE.PlaneGeometry(plateW - 0.06, plateH - 0.05), textMatFront);
+        textPlaneFront.position.set(0, 0, plateD / 2 + 0.002);
+        plate.add(textPlaneFront);
+
+        dObj.add(plate);
+
+        // Smart boards for selected classrooms only.
         const needsClassroomSmartBoard =
           (ALL_FLOORS[i] === 'groundgloor' && /^CLASSROOM G00[4-5]$/.test(plateText)) ||
           (ALL_FLOORS[i] === '3rdfloor' && /^CLASSROOM 30[1-6]$/.test(plateText)) ||
