@@ -597,6 +597,14 @@ function addSignBoard(text, position, yaw, width = 1.25, height = 0.28, bgColor 
   return group;
 }
 
+function getDoorNameplateWidth(text) {
+  const len = String(text || '').length;
+  if (len > 24) return 1.85;
+  if (len > 18) return 1.55;
+  if (len > 12) return 1.30;
+  return 1.05;
+}
+
 function applyQualityProfile(mode) {
   if (!renderer) return;
   const quality = mode || 'performance';
@@ -2473,8 +2481,8 @@ async function loadWorld() {
 
       const plateText = floorNameplates.get(dIndex);
       if (plateText) {
-        const plateW = plateText === 'MEETING ROOM' ? 1.25 : 0.90;
-        const plateH = 0.22;
+        const plateW = getDoorNameplateWidth(plateText);
+        const plateH = 0.26;
         const plateD = 0.025;
         const plateBottomY = 2.15; // 215 cm from floor (standard corridor signage)
         const corridorCenter = new THREE.Vector2(48.5, 7.5);
@@ -2497,10 +2505,15 @@ async function loadWorld() {
         plate.rotation.y = sideSign > 0 ? 0 : Math.PI;
 
         const tex = createTextTexture(plateText);
-        const textMatFront = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+        const textMatFront = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
         const textPlaneFront = new THREE.Mesh(new THREE.PlaneGeometry(plateW - 0.06, plateH - 0.05), textMatFront);
         textPlaneFront.position.set(0, 0, plateD / 2 + 0.002);
         plate.add(textPlaneFront);
+
+        const textPlaneBack = textPlaneFront.clone();
+        textPlaneBack.position.z = -plateD / 2 - 0.002;
+        textPlaneBack.rotation.y = Math.PI;
+        plate.add(textPlaneBack);
 
         dObj.add(plate);
 
