@@ -684,6 +684,133 @@ function addSignBoard(text, position, yaw, width = 1.25, height = 0.28, bgColor 
   return group;
 }
 
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  let line = '';
+  let cy = y;
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      ctx.fillText(line, x, cy);
+      line = word;
+      cy += lineHeight;
+    } else {
+      line = next;
+    }
+  }
+  if (line) ctx.fillText(line, x, cy);
+  return cy + lineHeight;
+}
+
+function createLabChartTexture(title, bullets, accent = '#0ea5e9') {
+  const key = `labChart:${title}:${bullets.join('|')}`;
+  if (TEXTURE_CACHE[key]) return TEXTURE_CACHE[key];
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 768;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(0, 0, canvas.width, 120);
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 120, canvas.width, 10);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 54px Arial';
+  wrapCanvasText(ctx, title.toUpperCase(), 48, 72, 930, 58);
+
+  ctx.fillStyle = '#1f2937';
+  ctx.font = '700 30px Arial';
+  let y = 190;
+  bullets.forEach((item, idx) => {
+    const rowTop = y - 34;
+    ctx.fillStyle = idx % 2 === 0 ? '#eef6ff' : '#f3f4f6';
+    ctx.fillRect(42, rowTop, 940, 92);
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(78, y, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1f2937';
+    ctx.font = '700 30px Arial';
+    y = wrapCanvasText(ctx, item, 112, y + 9, 820, 36) + 30;
+  });
+
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 5;
+  ctx.strokeRect(30, 140, canvas.width - 60, canvas.height - 170);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  TEXTURE_CACHE[key] = tex;
+  return tex;
+}
+
+function addWallChart(title, bullets, position, yaw, options = {}) {
+  const width = options.width ?? 1.65;
+  const height = options.height ?? 1.15;
+  const accent = options.accent ?? '#0ea5e9';
+  const group = new THREE.Group();
+  group.position.copy(position);
+  group.rotation.y = yaw;
+
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.10, height + 0.10, 0.045),
+    new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.55, metalness: 0.12 })
+  );
+  group.add(frame);
+
+  const board = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map: createLabChartTexture(title, bullets, accent) })
+  );
+  board.position.z = 0.026;
+  group.add(board);
+  scene.add(group);
+  return group;
+}
+
+function addLabChartsForFloor(floorKey, elev) {
+  const topics = {
+    '1stfloor': [
+      ['Computer Lab Safety', ['Use proper shutdown before leaving', 'Keep cables clear of walkways', 'Report overheating or loose power plugs'], '#0ea5e9'],
+      ['Programming Workflow', ['Problem analysis', 'Algorithm and flowchart', 'Code, test, debug, document'], '#22c55e']
+    ],
+    '2ndfloor': [
+      ['Computer Networks', ['Router connects different networks', 'Switch forwards frames inside LAN', 'IP address identifies each host'], '#2563eb'],
+      ['Database Systems', ['Tables store structured records', 'Primary keys identify rows', 'Indexes speed up search queries'], '#7c3aed']
+    ],
+    '4thfloor': [
+      ['Electronics Basics', ['Voltage drives current flow', 'Resistors limit current', 'Capacitors store electric charge'], '#f97316'],
+      ['Embedded Systems', ['Sensor input', 'Microcontroller processing', 'Actuator or display output'], '#14b8a6']
+    ],
+    '5thfloor': [
+      ['Cloud Computing', ['Virtual machines share hardware', 'Storage scales on demand', 'APIs connect distributed services'], '#0284c7'],
+      ['Cyber Security', ['Use strong authentication', 'Patch vulnerable software', 'Monitor logs and network traffic'], '#dc2626']
+    ]
+  };
+  const charts = topics[floorKey];
+  if (!charts) return;
+
+  const leftZ = [21.4, 12.8, 3.5, -9.8];
+  const rightZ = [8.7, 0.2, -5.3];
+
+  leftZ.forEach((z, idx) => {
+    const data = charts[idx % charts.length];
+    addWallChart(data[0], data[1], new THREE.Vector3(39.98, elev + 1.72, z), Math.PI / 2, { accent: data[2] });
+  });
+
+  rightZ.forEach((z, idx) => {
+    const data = charts[(idx + 1) % charts.length];
+    addWallChart(data[0], data[1], new THREE.Vector3(56.78, elev + 1.72, z), -Math.PI / 2, { accent: data[2] });
+  });
+}
+
 function getDoorNameplateWidth(text) {
   const len = String(text || '').length;
   if (len > 24) return 1.85;
@@ -2379,6 +2506,7 @@ async function loadWorld() {
     } else if (ALL_FLOORS[i] === '3rdfloor') {
       THIRD_FLOOR_CLASSROOM_BENCH_LAYOUTS.forEach((room) => addGroundClassroomBenchDeskLayout(room, elev));
     }
+    addLabChartsForFloor(ALL_FLOORS[i], elev);
 
     const classroomSmartBoardsPlaced = new Set();
     dD.forEach((d, dIndex) => {
