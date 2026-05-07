@@ -83,6 +83,10 @@ let activeLift = null;
 let liftDashboardOpen = false;
 let liftEntryInProgress = false;
 let liftEntryTimer = null;
+let liftTravelTimer = null;
+let liftTravelInProgress = false;
+let audioContext = null;
+let statusOverrideUntil = 0;
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -315,11 +319,58 @@ function activateEmergencyLockdown(world) {
     });
     (world.autoDoors || []).forEach((door) => { door.openUntil = 0; });
     (world.lifts || []).forEach((lift) => { lift.openUntil = 0; });
-    UI.zoneName.innerText = 'Emergency lockdown active';
+    setStatus('Emergency lockdown active', 3.0);
     return;
   }
 
-  UI.zoneName.innerText = 'Emergency lockdown cleared';
+  setStatus('Emergency lockdown cleared', 2.0);
+}
+
+function setStatus(message, duration = 2.0) {
+  if (UI.zoneName) UI.zoneName.innerText = message;
+  statusOverrideUntil = performance.now() + duration * 1000;
+}
+
+function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioContext.state === 'suspended') audioContext.resume();
+  return audioContext;
+}
+
+function playTone(freq = 620, duration = 0.12, type = 'sine', delay = 0) {
+  try {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const start = ctx.currentTime + delay;
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.08, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + duration + 0.03);
+  } catch (_) {}
+}
+
+function playLiftChime() {
+  playTone(660, 0.12, 'sine', 0);
+  playTone(880, 0.16, 'sine', 0.13);
+}
+
+function playDeniedTone() {
+  playTone(220, 0.16, 'square', 0);
+}
+
+function getRoomAccessRule(label) {
+  const text = String(label || '').toUpperCase();
+  if (text.includes('HEAD OF DEPARTMENT') || text.includes('SERVER ROOM') || text.includes('MEETING ROOM')) {
+    return { locked: true, message: `${text} - admin access required` };
+  }
+  return { locked: false, message: '' };
 }
 
 function getCurrentFloorIndex() {
@@ -328,14 +379,14 @@ function getCurrentFloorIndex() {
 }
 
 function enterLift(lift) {
-  if (!ctrl || !lift || emergencyLockdown || liftDashboardOpen || liftEntryInProgress) return;
+  if (!ctrl || !lift || emergencyLockdown || liftDashboardOpen || liftEntryInProgress || liftTravelInProgress) return;
   activeLift = lift;
   const floorIdx = getCurrentFloorIndex();
   liftEntryInProgress = true;
   ctrl.enabled = false;
   ctrl.resetInput();
   lift.openUntil = clock.elapsedTime + 2.0;
-  UI.zoneName.innerText = 'Lift opening';
+  setStatus('Lift opening', 1.2);
 
   if (liftEntryTimer) clearTimeout(liftEntryTimer);
   liftEntryTimer = setTimeout(() => {
@@ -350,7 +401,8 @@ function enterLift(lift) {
     ctrl.yaw = lift.yaw;
     ctrl.pitch = 0;
     lift.openUntil = clock.elapsedTime + 1.6;
-    UI.zoneName.innerText = 'Inside lift';
+    playTone(520, 0.1);
+    setStatus('Inside lift', 1.4);
     liftEntryInProgress = false;
     liftEntryTimer = null;
     openLiftDashboard(floorIdx);
@@ -382,12 +434,17 @@ function openLiftDashboard(currentFloorIdx) {
 }
 
 function closeLiftDashboard() {
+  if (liftTravelInProgress) return;
   liftDashboardOpen = false;
   activeLift = null;
   liftEntryInProgress = false;
   if (liftEntryTimer) {
     clearTimeout(liftEntryTimer);
     liftEntryTimer = null;
+  }
+  if (liftTravelTimer) {
+    clearTimeout(liftTravelTimer);
+    liftTravelTimer = null;
   }
   if (UI.liftDashboard) {
     UI.liftDashboard.classList.remove('active');
@@ -401,17 +458,47 @@ function closeLiftDashboard() {
 }
 
 function travelLiftToFloor(targetFloorIdx) {
-  if (!ctrl || !activeLift) return;
-  const targetLift = (minimapWorld?.lifts || []).find((lift) => lift.floorIndex === targetFloorIdx) || activeLift;
-  const targetY = targetFloorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight;
-  ctrl.pos.set(targetLift.cabin.x, targetY, targetLift.cabin.z);
-  ctrl.yaw = targetLift.yaw;
-  ctrl.pitch = 0;
-  targetLift.openUntil = clock.elapsedTime + 2.0;
-  UI.floorSelect.selectedIndex = ALL_FLOORS.length - 1 - targetFloorIdx;
-  if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
-  UI.zoneName.innerText = `${FLOOR_LABELS[targetFloorIdx]} - Lift Lobby`;
-  closeLiftDashboard();
+  if (!ctrl || !activeLift || liftTravelInProgress) return;
+  const currentFloorIdx = getCurrentFloorIndex();
+  if (targetFloorIdx === currentFloorIdx) {
+    setStatus(`Already at ${FLOOR_LABELS[targetFloorIdx]}`, 1.6);
+    playTone(520, 0.08);
+    return;
+  }
+
+  liftTravelInProgress = true;
+  ctrl.enabled = false;
+  ctrl.resetInput();
+  activeLift.openUntil = clock.elapsedTime + 0.55;
+  const duration = 900 + Math.abs(targetFloorIdx - currentFloorIdx) * 450;
+  setStatus(`Lift travelling to ${FLOOR_LABELS[targetFloorIdx]}`, Math.max(2.0, duration / 1000));
+  playTone(390, 0.12);
+
+  const buttons = UI.liftButtons ? Array.from(UI.liftButtons.querySelectorAll('button')) : [];
+  buttons.forEach((btn) => { btn.disabled = true; });
+
+  if (liftTravelTimer) clearTimeout(liftTravelTimer);
+  liftTravelTimer = setTimeout(() => {
+    if (!ctrl) {
+      liftTravelInProgress = false;
+      liftTravelTimer = null;
+      return;
+    }
+    liftTravelTimer = null;
+    liftTravelInProgress = false;
+
+    const targetLift = (minimapWorld?.lifts || []).find((lift) => lift.floorIndex === targetFloorIdx) || activeLift;
+    const targetY = targetFloorIdx * SETTINGS.floorHeight + SETTINGS.playerHeight;
+    ctrl.pos.set(targetLift.cabin.x, targetY, targetLift.cabin.z);
+    ctrl.yaw = targetLift.yaw;
+    ctrl.pitch = 0;
+    targetLift.openUntil = clock.elapsedTime + 2.0;
+    UI.floorSelect.selectedIndex = ALL_FLOORS.length - 1 - targetFloorIdx;
+    if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
+    playLiftChime();
+    setStatus(`Arrived at ${FLOOR_LABELS[targetFloorIdx]}`, 3.0);
+    closeLiftDashboard();
+  }, duration);
 }
 const toNum = (v, def = 0) => { const n = parseFloat(v); return isNaN(n) ? def : n; };
 
@@ -2384,6 +2471,27 @@ async function loadWorld() {
           sideBlockers
         });
 
+        const entranceHit = new THREE.Mesh(
+          new THREE.BoxGeometry(totalW + 0.4, doorH, 0.55),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        entranceHit.position.y = doorH / 2;
+        entranceHit.userData = {
+          type: 'slidingDoor',
+          toggle() {
+            if (emergencyLockdown) {
+              setStatus('Entrance locked by emergency lockdown');
+              playDeniedTone();
+              return;
+            }
+            const autoDoor = autoDoors[autoDoors.length - 1];
+            autoDoor.openUntil = clock.elapsedTime + 3.2;
+            setStatus('Entrance door opening');
+            playTone(520, 0.1);
+          }
+        };
+        dObj.add(entranceHit);
+        interactables.push(entranceHit);
         scene.add(dObj);
         return;
       }
@@ -2459,18 +2567,33 @@ async function loadWorld() {
         type:'door',
         isOpen:false,
         targetRot:0,
+        locked:false,
+        lockedMessage:'',
         colW,
         sideBlockers,
         toggle(){
+          if (this.locked) {
+            setStatus(this.lockedMessage || 'Admin access required');
+            playDeniedTone();
+            return;
+          }
           this.isOpen=!this.isOpen;
           this.targetRot=this.isOpen?Math.PI*0.6:0;
           this.colW.active=!this.isOpen;
           this.sideBlockers.forEach((b) => { b.active = true; });
+          setStatus(this.isOpen ? 'Door opened' : 'Door closed');
+          playTone(this.isOpen ? 480 : 360, 0.08);
         },
         pivot: piv
       };
 
       const plateText = floorNameplates.get(dIndex);
+      if (plateText) {
+        const accessRule = getRoomAccessRule(plateText);
+        hit.userData.roomName = plateText;
+        hit.userData.locked = accessRule.locked;
+        hit.userData.lockedMessage = accessRule.message;
+      }
       if (plateText) {
         const plateW = getDoorNameplateWidth(plateText);
         const plateH = 0.26;
@@ -2696,7 +2819,9 @@ class FPSController {
     const zInfo = getZone(this.pos.x, this.pos.z);
     const floorIdx = Math.round((this.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight);
     const clampedFloorIdx = Math.max(0, Math.min(FLOOR_LABELS.length - 1, floorIdx));
-    UI.zoneName.innerText = `${FLOOR_LABELS[clampedFloorIdx]} - ${zInfo.name}`;
+    if (performance.now() > statusOverrideUntil) {
+      UI.zoneName.innerText = `${FLOOR_LABELS[clampedFloorIdx]} - ${zInfo.name}`;
+    }
     const desiredIndex = ALL_FLOORS.length - 1 - clampedFloorIdx;
     if (UI.floorSelect.selectedIndex !== desiredIndex) { UI.floorSelect.selectedIndex = desiredIndex; }
   }
@@ -2864,7 +2989,8 @@ async function init() {
       if(hits.length > 0 && hits[0].distance < 3) {
         const ud = hits[0].object.userData || {};
         if (emergencyLockdown && ud.type === 'door') {
-          UI.zoneName.innerText = 'Door locked by emergency lockdown';
+          setStatus('Door locked by emergency lockdown', 2.0);
+          playDeniedTone();
           return;
         }
         if (ud.type === 'lift') {
@@ -2913,8 +3039,6 @@ async function init() {
 
     (world.autoDoors || []).forEach(ad => {
       if (ad.kind !== 'slidingEntrance') return;
-      const dist = ctrl ? ctrl.pos.distanceTo(ad.pos) : 999;
-      if (!emergencyLockdown && dist < 2.6) ad.openUntil = t + 3.0;
       ad.targetOpen = t < ad.openUntil ? 1 : 0;
       ad.openAmount += (ad.targetOpen - ad.openAmount) * Math.min(1, dt * 6.5);
 
