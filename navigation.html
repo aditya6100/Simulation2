@@ -139,6 +139,31 @@
       .legend .start::before { background: #20e06b; }
       .legend .dest::before { background: #ff3b5f; }
       .legend .route::before { background: #00ffcc; border-radius: 2px; }
+      .route-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .route-summary div {
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px;
+        padding: 8px;
+        background: rgba(255,255,255,0.06);
+      }
+      .route-summary span {
+        display: block;
+        margin-bottom: 4px;
+        color: rgba(255,255,255,0.62);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .route-summary strong {
+        color: #fff;
+        font-size: 13px;
+      }
       @media (max-width: 760px) {
         #nav-ui {
           left: 10px;
@@ -196,6 +221,11 @@
 
       <button id="go-btn">Start Navigation</button>
       <div id="status-msg">Select start and end points on the map.</div>
+      <div class="route-summary" aria-label="Route summary">
+        <div><span>Distance</span><strong id="route-distance">--</strong></div>
+        <div><span>ETA</span><strong id="route-eta">--</strong></div>
+        <div><span>Turns</span><strong id="route-turns">--</strong></div>
+      </div>
       <div class="legend" aria-label="Map legend">
         <span class="start">Current</span>
         <span class="dest">Destination</span>

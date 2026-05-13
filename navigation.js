@@ -22,7 +22,10 @@ const UI = {
   minimapCanvas: document.getElementById('minimap-canvas'),
   arBtn: document.getElementById('ar-btn'),
   pickStartBtn: document.getElementById('pick-start-btn'),
-  pickDestBtn: document.getElementById('pick-dest-btn')
+  pickDestBtn: document.getElementById('pick-dest-btn'),
+  routeDistance: document.getElementById('route-distance'),
+  routeEta: document.getElementById('route-eta'),
+  routeTurns: document.getElementById('route-turns')
 };
 
 let currentFloor = '4thfloor';
@@ -259,12 +262,14 @@ UI.minimapCanvas.addEventListener('click', (e) => {
   if (pickMode === 'start') {
     startPos = point;
     path = [];
+    resetRouteSummary();
     UI.startSelect.value = '';
     UI.statusMsg.innerText = 'Current location set. Pick your destination.';
     setPickMode('dest');
   } else {
     destPos = point;
     path = [];
+    resetRouteSummary();
     UI.destSelect.value = '';
     UI.statusMsg.innerText = "Destination set. Click 'Start Navigation'.";
   }
@@ -436,6 +441,47 @@ function setPickMode(mode) {
   UI.pickDestBtn.classList.toggle('active', mode === 'dest');
 }
 
+function resetRouteSummary() {
+  if (UI.routeDistance) UI.routeDistance.innerText = '--';
+  if (UI.routeEta) UI.routeEta.innerText = '--';
+  if (UI.routeTurns) UI.routeTurns.innerText = '--';
+}
+
+function routeDistanceMeters(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
+  }
+  return total;
+}
+
+function routeTurnCount(points) {
+  let turns = 0;
+  for (let i = 2; i < points.length; i++) {
+    const ax = points[i - 1].x - points[i - 2].x;
+    const az = points[i - 1].z - points[i - 2].z;
+    const bx = points[i].x - points[i - 1].x;
+    const bz = points[i].z - points[i - 1].z;
+    const al = Math.hypot(ax, az) || 1;
+    const bl = Math.hypot(bx, bz) || 1;
+    const dot = (ax * bx + az * bz) / (al * bl);
+    if (dot < 0.72) turns++;
+  }
+  return turns;
+}
+
+function updateRouteSummary(points) {
+  if (!points || points.length < 2) {
+    resetRouteSummary();
+    return;
+  }
+  const meters = routeDistanceMeters(points);
+  const etaMinutes = Math.max(1, Math.round(meters / 70));
+  if (UI.routeDistance) UI.routeDistance.innerText = `${meters.toFixed(0)} m`;
+  if (UI.routeEta) UI.routeEta.innerText = `${etaMinutes} min`;
+  if (UI.routeTurns) UI.routeTurns.innerText = String(routeTurnCount(points));
+}
+
 UI.goBtn.addEventListener('click', () => {
   if (!startPos || !destPos) {
     UI.statusMsg.innerText = 'Select both current location and destination first.';
@@ -445,9 +491,13 @@ UI.goBtn.addEventListener('click', () => {
   if (path.length > 0) {
     renderMinimap();
     visualizePath3D();
+    updateRouteSummary(path);
     UI.statusMsg.innerText = `Route ready: ${path.length} waypoints. Follow the cyan line.`;
   }
-  else UI.statusMsg.innerText = 'No path found. Pick a nearby corridor point and try again.';
+  else {
+    resetRouteSummary();
+    UI.statusMsg.innerText = 'No path found. Pick a nearby corridor point and try again.';
+  }
 });
 
 UI.destSelect.addEventListener('change', (e) => {
@@ -455,6 +505,7 @@ UI.destSelect.addEventListener('change', (e) => {
   if (!loc) return;
   destPos = { x: loc.x, z: loc.z };
   path = [];
+  resetRouteSummary();
   renderMinimap();
   UI.statusMsg.innerText = `Destination set: ${loc.name}.`;
 });
@@ -464,6 +515,7 @@ UI.startSelect.addEventListener('change', (e) => {
   if (!loc) return;
   startPos = { x: loc.x, z: loc.z };
   path = [];
+  resetRouteSummary();
   setPickMode('dest');
   renderMinimap();
   UI.statusMsg.innerText = `Current location set: ${loc.name}.`;
@@ -485,6 +537,7 @@ function updateLocationDropdowns() {
   navLocations = buildNavLocations();
   fillLocationSelect(UI.startSelect, 'Select Current Location');
   fillLocationSelect(UI.destSelect, 'Select Destination');
+  resetRouteSummary();
 }
 
 // --- 7. 3D VISUALIZATION ---

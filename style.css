@@ -203,6 +203,76 @@ canvas{
 #panel-left-top{ left: 14px; top: 14px; }
 #panel-right-top{ right: 14px; top: 14px; text-align: right; }
 #panel-left-bottom{ left: 14px; bottom: 14px; }
+#mission-hud{
+  left: 50%;
+  top: 14px;
+  width: min(430px, calc(100vw - 620px));
+  min-width: 320px;
+  transform: translateX(-50%);
+}
+
+.hud-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hud-grid div{
+  min-height: 54px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.66);
+  box-sizing: border-box;
+}
+
+.hud-grid span{
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hud-grid strong{
+  display: block;
+  min-width: 0;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#interactionPrompt{
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  z-index: 7;
+  display: none;
+  min-width: min(360px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  border: 1px solid rgba(255,255,255,0.24);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.84);
+  color: #f8fafc;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.26);
+  font-size: 13px;
+  font-weight: 750;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+  box-sizing: border-box;
+}
+
+#interactionPrompt.active{
+  display: block;
+}
 
 .panel-link-row{
   margin-top: 10px;
@@ -784,6 +854,9 @@ canvas{
   #panel-left-top{ left: 8px; top: 8px; }
   #panel-right-top{ right: 8px; top: 8px; }
   #panel-left-bottom{ left: 8px; bottom: 170px; }
+  #mission-hud{
+    display: none;
+  }
 
   #minimap-container{
     right: 8px;
@@ -882,6 +955,10 @@ canvas{
     transform: translateX(-50%);
     width: min(230px, 38vw);
     text-align: center;
+  }
+
+  #mission-hud{
+    display: none;
   }
 
   #minimap-container{

@@ -71,6 +71,28 @@
         <div class="panel-body current-zone" id="zoneName">Main Corridor</div>
       </div>
 
+      <div id="mission-hud" class="panel">
+        <div class="panel-title">Explorer HUD</div>
+        <div class="hud-grid">
+          <div>
+            <span>Floor</span>
+            <strong id="hudFloor">4th Floor</strong>
+          </div>
+          <div>
+            <span>Nearest Room</span>
+            <strong id="hudRoom">Scanning</strong>
+          </div>
+          <div>
+            <span>Coordinates</span>
+            <strong id="hudCoords">--, --</strong>
+          </div>
+          <div>
+            <span>Systems</span>
+            <strong id="hudSystems">Normal</strong>
+          </div>
+        </div>
+      </div>
+
       <div id="minimap-container">
         <div class="minimap-header">
           <span>Live Map</span>
@@ -79,6 +101,8 @@
         <canvas id="minimap-canvas"></canvas>
       </div>
     </div>
+
+    <div id="interactionPrompt" aria-live="polite"></div>
 
     <div id="overlay">
       <div class="overlay-card">

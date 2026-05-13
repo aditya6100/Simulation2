@@ -39,6 +39,11 @@ const UI = {
   liftCurrentFloor: document.getElementById('liftCurrentFloor'),
   liftButtons: document.getElementById('liftButtons'),
   liftCloseBtn: document.getElementById('liftCloseBtn'),
+  hudFloor: document.getElementById('hudFloor'),
+  hudRoom: document.getElementById('hudRoom'),
+  hudCoords: document.getElementById('hudCoords'),
+  hudSystems: document.getElementById('hudSystems'),
+  interactionPrompt: document.getElementById('interactionPrompt'),
   mobileControls: document.getElementById('mobileControls'),
   movePad: document.getElementById('movePad'),
   lookPad: document.getElementById('lookPad'),
@@ -118,8 +123,8 @@ function CollisionSystem() {
   this.addWall = function(x1, z1, x2, z2, t, yMin, yMax) { 
     this.walls.push({ x1, z1, x2, z2, half: t/2, yMin, yMax, active: true }); 
   };
-  this.addClearance = function(x, z, r, yMin, yMax) {
-    this.clearances.push({ x, z, r, yMin, yMax });
+  this.addClearance = function(x, z, r, yMin, yMax, options = {}) {
+    this.clearances.push({ x, z, r, yMin, yMax, active: options.active ?? true, doorControlled: !!options.doorControlled });
   };
   this.addRamp = function(cx, cz, y0, y1, angle, width, run, landing = 1.3) {
     this.ramps.push({ cx, cz, y0, y1, angle, width, run, landing });
@@ -131,6 +136,7 @@ function CollisionSystem() {
       if(w.yMin !== undefined && (pos.y < w.yMin || pos.y - SETTINGS.playerHeight > w.yMax)) continue;
       let inDoorClearance = false;
       for (const c of this.clearances) {
+        if (!c.active) continue;
         if (c.yMin !== undefined && (pos.y < c.yMin || pos.y - SETTINGS.playerHeight > c.yMax)) continue;
         if (Math.hypot(n.x - c.x, n.z - c.z) < c.r) { inDoorClearance = true; break; }
       }
@@ -841,6 +847,95 @@ function getCurrentFloorIndex() {
   return Math.max(0, Math.min(ALL_FLOORS.length - 1, Math.round((ctrl.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight)));
 }
 
+function getCurrentFloorContext() {
+  const floorIdx = getCurrentFloorIndex();
+  const floorKey = ALL_FLOORS[floorIdx];
+  const zone = ctrl ? getZone(ctrl.pos, floorIdx * SETTINGS.floorHeight) : { name: 'Main Corridor' };
+  return { floorIdx, floorKey, floorLabel: FLOOR_LABELS[floorIdx], zoneName: zone.name };
+}
+
+function getNearestNamedRoom(maxDistance = 4.8) {
+  if (!ctrl || !minimapWorld) return null;
+  const { floorKey } = getCurrentFloorContext();
+  const floor = minimapWorld.floorDataMap.get(floorKey);
+  if (!floor || !Array.isArray(floor.doors)) return null;
+
+  let nearest = null;
+  for (const door of floor.doors) {
+    if (!door.label) continue;
+    const d = Math.hypot(ctrl.pos.x - door.x, ctrl.pos.z - door.z);
+    if (d <= maxDistance && (!nearest || d < nearest.distance)) nearest = { ...door, distance: d };
+  }
+  return nearest;
+}
+
+function setInteractionPrompt(message) {
+  if (!UI.interactionPrompt) return;
+  if (!message) {
+    UI.interactionPrompt.classList.remove('active');
+    UI.interactionPrompt.textContent = '';
+    return;
+  }
+  UI.interactionPrompt.textContent = message;
+  UI.interactionPrompt.classList.add('active');
+}
+
+function updateExplorerHud(world) {
+  if (!ctrl) return;
+  const { floorLabel, zoneName } = getCurrentFloorContext();
+  const nearestRoom = getNearestNamedRoom();
+
+  if (UI.hudFloor) UI.hudFloor.textContent = floorLabel;
+  if (UI.hudRoom) UI.hudRoom.textContent = nearestRoom ? nearestRoom.label : zoneName;
+  if (UI.hudCoords) UI.hudCoords.textContent = `${ctrl.pos.x.toFixed(1)}, ${ctrl.pos.z.toFixed(1)}`;
+  if (UI.hudSystems) {
+    const states = [];
+    if (emergencyLockdown) states.push('Lockdown');
+    if (stormActive) states.push('Storm');
+    if (flashlight && flashlight.intensity > 0) states.push('Light');
+    if (liftTravelInProgress) states.push('Lift moving');
+    UI.hudSystems.textContent = states.length ? states.join(' / ') : 'Normal';
+  }
+
+  if (!ctrl.enabled || liftDashboardOpen || liftEntryInProgress) {
+    setInteractionPrompt('');
+    return;
+  }
+
+  const nearestLift = emergencyLockdown ? null : (world.lifts || [])
+    .map((l) => ({ l, d: Math.min(ctrl.pos.distanceTo(l.call.position), l.center ? ctrl.pos.distanceTo(l.center) : 999) }))
+    .sort((a, b) => a.d - b.d)[0];
+  if (nearestLift && nearestLift.d < 3.5) {
+    setInteractionPrompt('Press E to call the lift');
+    return;
+  }
+
+  raycaster.setFromCamera(new THREE.Vector2(), camera);
+  const hits = raycaster.intersectObjects(world.interactables);
+  if (hits.length > 0 && hits[0].distance < 3) {
+    const ud = hits[0].object.userData || {};
+    if (ud.type === 'door' && ud.roomName) {
+      setInteractionPrompt(`Press E to open ${ud.roomName}`);
+      return;
+    }
+    if (ud.type === 'lift') {
+      setInteractionPrompt('Press E to call the lift');
+      return;
+    }
+    if (ud.toggle) {
+      setInteractionPrompt('Press E to interact');
+      return;
+    }
+  }
+
+  if (nearestRoom && nearestRoom.distance < 2.2) {
+    setInteractionPrompt(`Nearby: ${nearestRoom.label}`);
+    return;
+  }
+
+  setInteractionPrompt('');
+}
+
 function enterLift(lift) {
   if (!ctrl || !lift || emergencyLockdown || liftDashboardOpen || liftEntryInProgress || liftTravelInProgress) return;
   activeLift = lift;
@@ -1219,7 +1314,7 @@ function addWallChart(title, bullets, position, yaw, options = {}) {
   const height = options.height ?? 1.15;
   const accent = options.accent ?? '#0ea5e9';
   const wallThickness = options.wallThickness ?? 0.25;
-  const wallInset = options.wallInset ?? 0.012;
+  const wallInset = options.wallInset ?? -0.006;
   const mountDepth = 0.045;
   const group = new THREE.Group();
   group.position.copy(position);
@@ -1244,41 +1339,284 @@ function addWallChart(title, bullets, position, yaw, options = {}) {
   return group;
 }
 
-function addLabChartsForFloor(floorKey, elev) {
+function createNoticeBoardTexture(floorKey = 'groundgloor') {
+  const key = `noticeBoard:${floorKey}`;
+  if (TEXTURE_CACHE[key]) return TEXTURE_CACHE[key];
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f7e6b4';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#7c2d12';
+  ctx.fillRect(0, 0, canvas.width, 86);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 48px Arial';
+  ctx.fillText('NOTICE BOARD', 205, 58);
+  const boardData = {
+    groundgloor: [
+      ['ADMISSION', '#fde68a', 70, 130],
+      ['NOTICE', '#bfdbfe', 325, 125],
+      ['CIRCULAR', '#bbf7d0', 120, 295],
+      ['EVENT', '#fecaca', 415, 285]
+    ],
+    '1stfloor': [
+      ['LAB', '#fde68a', 70, 130],
+      ['SCHEDULE', '#bfdbfe', 325, 125],
+      ['CLASS', '#bbf7d0', 120, 295],
+      ['DEADLINE', '#fecaca', 415, 285]
+    ],
+    '2ndfloor': [
+      ['HOD', '#fde68a', 70, 130],
+      ['TUTORIAL', '#bfdbfe', 325, 125],
+      ['LAB', '#bbf7d0', 120, 295],
+      ['MEETING', '#fecaca', 415, 285]
+    ],
+    '3rdfloor': [
+      ['CLASS 301', '#fde68a', 70, 130],
+      ['CLASS 302', '#bfdbfe', 325, 125],
+      ['CLASS 303', '#bbf7d0', 120, 295],
+      ['EVENT', '#fecaca', 415, 285]
+    ],
+    '4thfloor': [
+      ['LAB 404', '#fde68a', 70, 130],
+      ['LAB 405', '#bfdbfe', 325, 125],
+      ['LAB 406', '#bbf7d0', 120, 295],
+      ['LAB 407', '#fecaca', 415, 285]
+    ],
+    '5thfloor': [
+      ['LAB 501', '#fde68a', 70, 130],
+      ['LAB 502', '#bfdbfe', 325, 125],
+      ['LAB 503', '#bbf7d0', 120, 295],
+      ['LAB 504', '#fecaca', 415, 285]
+    ]
+  };
+  const notes = boardData[floorKey] || boardData.groundgloor;
+  notes.forEach(([text, color, x, y], idx) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, idx % 2 ? 210 : 185, 120);
+    ctx.strokeStyle = '#92400e';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, idx % 2 ? 210 : 185, 120);
+    ctx.fillStyle = '#111827';
+    ctx.font = '800 26px Arial';
+    ctx.fillText(text, x + 18, y + 42);
+    ctx.font = '600 18px Arial';
+    ctx.fillText('Updated notice', x + 18, y + 78);
+  });
+  ctx.strokeStyle = '#5b3418';
+  ctx.lineWidth = 18;
+  ctx.strokeRect(9, 9, canvas.width - 18, canvas.height - 18);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.anisotropy = 4;
+  TEXTURE_CACHE[key] = tex;
+  return tex;
+}
+
+function addNoticeBoard(position, yaw, floorKey = 'groundgloor') {
+  const group = new THREE.Group();
+  group.position.copy(position);
+  group.rotation.y = yaw;
+  const width = 1.9;
+  const height = 1.18;
+  const frameDepth = 0.055;
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.12, height + 0.12, frameDepth),
+    new THREE.MeshStandardMaterial({ color: 0x5b3418, roughness: 0.62, metalness: 0.04 })
+  );
+  group.add(frame);
+  const board = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map: createNoticeBoardTexture(floorKey) })
+  );
+  board.position.z = frameDepth / 2 + 0.004;
+  group.add(board);
+  scene.add(group);
+}
+
+function addVendingMachine(position, yaw) {
+  const group = new THREE.Group();
+  group.position.copy(position);
+  group.rotation.y = yaw;
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.34, metalness: 0.5 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.24, metalness: 0.7 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfe7ff, transparent: true, opacity: 0.3, roughness: 0.08, metalness: 0.1 });
+  const snackColors = [0xef4444, 0xf59e0b, 0x22c55e, 0x3b82f6, 0xec4899, 0x8b5cf6];
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2.05, 0.72), bodyMat);
+  body.position.y = 1.02;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.42, 0.035), glassMat);
+  glass.position.set(0, 1.22, 0.37);
+  group.add(glass);
+
+  const topPanel = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.16, 0.08), trimMat);
+  topPanel.position.set(0, 1.96, 0.35);
+  group.add(topPanel);
+
+  const coinSlot = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.10, 0.05), trimMat);
+  coinSlot.position.set(0.22, 1.52, 0.37);
+  group.add(coinSlot);
+
+  const keypad = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.24, 0.04), trimMat);
+  keypad.position.set(0.23, 1.32, 0.37);
+  group.add(keypad);
+
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.10, 0.03), new THREE.MeshStandardMaterial({ color: 0xfff1c1, roughness: 0.4 }));
+  stripe.position.set(0, 1.78, 0.37);
+  group.add(stripe);
+
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 3; col++) {
+      const snack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.16, 0.035),
+        new THREE.MeshStandardMaterial({ color: snackColors[(row * 3 + col) % snackColors.length], roughness: 0.56 })
+      );
+      snack.position.set(-0.28 + col * 0.28, 1.55 - row * 0.28, 0.39);
+      group.add(snack);
+    }
+  }
+
+  const lowerTray = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.12, 0.08), trimMat);
+  lowerTray.position.set(0, 0.32, 0.32);
+  group.add(lowerTray);
+
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.06), bodyMat);
+  slot.position.set(0, 0.20, 0.38);
+  group.add(slot);
+
+  scene.add(group);
+}
+
+function snapWallMountToWall(position, yaw, walls, options = {}) {
+  const maxDistance = options.maxDistance ?? 4.5;
+  let best = null;
+  const preferredX = Math.sin(yaw);
+  const preferredZ = Math.cos(yaw);
+
+  for (const w of walls || []) {
+    if (!w.p1 || !w.p2) continue;
+    const vx = w.p2.x - w.p1.x;
+    const vz = w.p2.z - w.p1.z;
+    const l2 = vx * vx + vz * vz;
+    if (l2 < 1e-6) continue;
+
+    const t = Math.max(0, Math.min(1, ((position.x - w.p1.x) * vx + (position.z - w.p1.z) * vz) / l2));
+    const px = w.p1.x + t * vx;
+    const pz = w.p1.z + t * vz;
+    const dx = position.x - px;
+    const dz = position.z - pz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 > maxDistance * maxDistance) continue;
+
+    const len = Math.hypot(vx, vz) || 1;
+    const nx = -vz / len;
+    const nz = vx / len;
+    const alignment = Math.abs(nx * preferredX + nz * preferredZ);
+    const score = d2 - alignment * 12.0;
+    if (!best || score < best.score) best = { w, px, pz, d2, score };
+  }
+
+  if (!best) return { position, yaw };
+
+  const wx = best.w.p2.x - best.w.p1.x;
+  const wz = best.w.p2.z - best.w.p1.z;
+  const len = Math.hypot(wx, wz) || 1;
+  let nx = -wz / len;
+  let nz = wx / len;
+
+  if (nx * preferredX + nz * preferredZ < 0) {
+    nx *= -1;
+    nz *= -1;
+  }
+
+  return {
+    position: new THREE.Vector3(best.px, position.y, best.pz),
+    yaw: Math.atan2(nx, nz)
+  };
+}
+
+function addLabChartsForFloor(floorKey, elev, walls = []) {
   const topics = {
     '1stfloor': [
       ['Computer Lab Safety', ['Use proper shutdown before leaving', 'Keep cables clear of walkways', 'Report overheating or loose power plugs'], '#0ea5e9'],
-      ['Programming Workflow', ['Problem analysis', 'Algorithm and flowchart', 'Code, test, debug, document'], '#22c55e']
+      ['Programming Workflow', ['Problem analysis', 'Algorithm and flowchart', 'Code, test, debug, document'], '#22c55e'],
+      ['Operating Systems', ['Process scheduling shares CPU time', 'Memory manager protects address space', 'File systems organize persistent data'], '#6366f1'],
+      ['Data Structures', ['Arrays store indexed values', 'Stacks follow last-in first-out', 'Trees model hierarchy efficiently'], '#f59e0b'],
+      ['Web Technology', ['HTML defines document structure', 'CSS controls visual presentation', 'JavaScript handles interaction'], '#06b6d4'],
+      ['Software Testing', ['Unit tests check small functions', 'Integration tests verify modules', 'Regression tests protect fixes'], '#ef4444']
     ],
     '2ndfloor': [
       ['Computer Networks', ['Router connects different networks', 'Switch forwards frames inside LAN', 'IP address identifies each host'], '#2563eb'],
-      ['Database Systems', ['Tables store structured records', 'Primary keys identify rows', 'Indexes speed up search queries'], '#7c3aed']
+      ['Database Systems', ['Tables store structured records', 'Primary keys identify rows', 'Indexes speed up search queries'], '#7c3aed'],
+      ['Network Security', ['Firewalls filter traffic rules', 'VPNs encrypt remote access', 'IDS detects suspicious patterns'], '#dc2626'],
+      ['SQL Concepts', ['SELECT reads matching rows', 'JOIN combines related tables', 'Transactions keep changes consistent'], '#16a34a'],
+      ['Server Administration', ['Monitor CPU and memory usage', 'Backups protect critical data', 'Logs reveal system failures'], '#0891b2'],
+      ['Distributed Systems', ['Replicas improve availability', 'Consensus coordinates decisions', 'Latency affects user experience'], '#9333ea']
     ],
     '4thfloor': [
       ['Electronics Basics', ['Voltage drives current flow', 'Resistors limit current', 'Capacitors store electric charge'], '#f97316'],
-      ['Embedded Systems', ['Sensor input', 'Microcontroller processing', 'Actuator or display output'], '#14b8a6']
+      ['Embedded Systems', ['Sensor input', 'Microcontroller processing', 'Actuator or display output'], '#14b8a6'],
+      ['Digital Logic', ['Gates implement Boolean algebra', 'Flip-flops store one bit', 'Counters sequence clock pulses'], '#2563eb'],
+      ['Signal Processing', ['Sampling converts analog signals', 'Filters remove unwanted noise', 'FFT reveals frequency content'], '#7c3aed'],
+      ['IoT Architecture', ['Devices collect sensor data', 'Gateways bridge local networks', 'Cloud dashboards analyze events'], '#16a34a'],
+      ['PCB Design', ['Short traces reduce noise', 'Ground planes improve stability', 'DRC checks manufacturing rules'], '#dc2626']
     ],
     '5thfloor': [
       ['Cloud Computing', ['Virtual machines share hardware', 'Storage scales on demand', 'APIs connect distributed services'], '#0284c7'],
-      ['Cyber Security', ['Use strong authentication', 'Patch vulnerable software', 'Monitor logs and network traffic'], '#dc2626']
+      ['Cyber Security', ['Use strong authentication', 'Patch vulnerable software', 'Monitor logs and network traffic'], '#dc2626'],
+      ['DevOps Pipeline', ['Version control tracks code', 'CI runs automated checks', 'CD releases approved builds'], '#22c55e'],
+      ['Machine Learning', ['Features describe input data', 'Models learn from examples', 'Validation measures generalization'], '#7c3aed'],
+      ['Cloud Security', ['IAM limits user privileges', 'Encryption protects stored data', 'Audit trails support investigation'], '#f97316'],
+      ['API Design', ['REST resources use clear URLs', 'Status codes describe outcomes', 'Rate limits protect services'], '#0ea5e9']
     ]
   };
   const charts = topics[floorKey];
   if (!charts) return;
 
-  const leftZ = [21.2, 12.4, 3.4, -9.6];
-  const rightZ = [8.5, 0.0, -5.0];
-  const leftRoomWallX = 43.25;
-  const rightRoomWallX = 53.35;
+  const placements = [
+    { x: 46.83, z: 22.35, yaw: -Math.PI / 2 },
+    { x: 45.35, z: 19.64, yaw: 0 },
+    { x: 43.93, z: 22.35, yaw: Math.PI / 2 },
 
-  leftZ.forEach((z, idx) => {
-    const data = charts[idx % charts.length];
-    addWallChart(data[0], data[1], new THREE.Vector3(leftRoomWallX, elev + 1.72, z), Math.PI / 2, { accent: data[2] });
-  });
+    { x: 46.83, z: 13.20, yaw: -Math.PI / 2 },
+    { x: 43.35, z: 15.56, yaw: Math.PI },
+    { x: 43.35, z: 10.66, yaw: 0 },
 
-  rightZ.forEach((z, idx) => {
-    const data = charts[(idx + 1) % charts.length];
-    addWallChart(data[0], data[1], new THREE.Vector3(rightRoomWallX, elev + 1.72, z), -Math.PI / 2, { accent: data[2] });
+    { x: 46.83, z: 2.00, yaw: -Math.PI / 2 },
+    { x: 43.35, z: 6.26, yaw: Math.PI },
+    { x: 43.35, z: -3.14, yaw: 0 },
+
+    { x: 45.25, z: -6.14, yaw: Math.PI },
+    { x: 48.83, z: -10.80, yaw: Math.PI / 2 },
+    { x: 43.20, z: -16.24, yaw: 0 },
+
+    { x: 49.43, z: 12.10, yaw: Math.PI / 2, right: true },
+    { x: 52.60, z: 15.56, yaw: Math.PI, right: true },
+    { x: 52.60, z: 6.26, yaw: 0, right: true },
+
+    { x: 49.43, z: 1.50, yaw: Math.PI / 2, right: true },
+    { x: 52.60, z: -3.14, yaw: 0, right: true },
+    { x: 52.60, z: 6.26, yaw: Math.PI, right: true },
+
+    { x: 51.35, z: -6.22, yaw: 0, right: true },
+    { x: 50.53, z: -12.40, yaw: Math.PI / 2, right: true },
+    { x: 53.25, z: -9.04, yaw: Math.PI, right: true }
+  ];
+
+  placements.forEach((placement, idx) => {
+    const chart = charts[(idx + (placement.right ? 1 : 0)) % charts.length];
+    const seed = new THREE.Vector3(placement.x, elev + 1.72, placement.z);
+    const mount = snapWallMountToWall(seed, placement.yaw, walls, { maxDistance: 0.45 });
+    addWallChart(chart[0], chart[1], mount.position, mount.yaw, {
+      accent: chart[2],
+      width: 1.00,
+      height: 0.72
+    });
   });
 }
 
@@ -1288,6 +1626,27 @@ function getDoorNameplateWidth(text) {
   if (len > 18) return 1.55;
   if (len > 12) return 1.30;
   return 1.05;
+}
+
+function getEffectiveDoorWidth(floorKey, doorIndex, doorData, label = '', isMainEntrance = false) {
+  const rawWidth = toWorld(doorData?.width || 120);
+  if (isMainEntrance) return Math.max(1.8, rawWidth);
+
+  const text = `${label} ${doorData?.name || ''}`.toLowerCase();
+  const isRoomDoor =
+    text.includes('lab') ||
+    text.includes('classroom') ||
+    text.includes('tutorial') ||
+    text.includes('library') ||
+    text.includes('server') ||
+    text.includes('meeting') ||
+    text.includes('department') ||
+    text.includes('hod') ||
+    text.includes('washroom') ||
+    text.includes('room');
+
+  if (isRoomDoor) return Math.max(0.9, Math.min(1.2, rawWidth));
+  return Math.max(0.75, Math.min(1.2, rawWidth));
 }
 
 function addDoorJambBlockers(x, z, w, ang, yMin, yMax, options = {}) {
@@ -1595,6 +1954,7 @@ function placeSmartBoardSetup(boardPos, yaw, elev) {
   const frontZ = Math.cos(yaw);
   const deskPos = new THREE.Vector3(boardPos.x + frontX * 1.35, elev, boardPos.z + frontZ * 1.35);
   addInstance('table', deskPos, yaw, new THREE.Vector3(1.45, 1, 0.55));
+  addDeskBooksAndFiles(deskPos.x, deskPos.z, yaw, elev, { width: 1.45, depth: 0.55 });
 
   if (!SETTINGS.performanceMode) {
     const light = new THREE.PointLight(0xfff0cc, 0.45, 3.4, 1.8);
@@ -1643,6 +2003,9 @@ function addWindowsFromSourceData(windowsData, elev) {
   (windowsData || []).forEach((windowData) => {
     const name = String(windowData.name || windowData.catalogId || '').toLowerCase();
     if (!name.includes('window')) return;
+    const x = toWorld(windowData.x);
+    const z = toWorld(windowData.y);
+    if (Math.abs(z - 24.66) < 1.0 && x >= 39.0 && x <= 56.0) return;
     placeSourceWindow(windowData, elev);
   });
 }
@@ -1679,8 +2042,6 @@ function addExteriorWindowsForFloor(floorKey, elev) {
   placeWindowRun(56.93, 19.8, 56.93, 23.2, elev, 1, { yaw: -Math.PI / 2, scale: corridorScale });
 
   // Main entrance and rear external corridors: aligned horizontal strip windows.
-  placeWindowRun(40.9, 24.66, 46.0, 24.66, elev, 2, { yaw: Math.PI, scale: corridorScale });
-  placeWindowRun(47.8, 24.66, 53.5, 24.66, elev, 2, { yaw: Math.PI, scale: corridorScale });
   placeWindowRun(41.4, -16.24, 47.6, -16.24, elev, 2, { yaw: 0, scale: corridorScale });
 
   // Lift/stair lobby gets taller vertical daylight windows.
@@ -1689,6 +2050,26 @@ function addExteriorWindowsForFloor(floorKey, elev) {
   // Toilet/privacy windows: small high-level openings.
   placeWindowRun(51.4, -16.24, 55.6, -16.24, elev, 3, { yaw: 0, y: 2.02, scale: toiletScale });
   placeWindowRun(56.93, -8.4, 56.93, -4.1, elev, 2, { yaw: -Math.PI / 2, y: 2.02, scale: toiletScale });
+}
+
+function addTopCorridorSolidWallPatch(floorKey, elev) {
+  return;
+  const x1 = 46.83;
+  const x2 = 54.13;
+  const z = 24.66;
+  const len = x2 - x1;
+  const wall = new THREE.Mesh(
+    new THREE.BoxGeometry(len, SETTINGS.floorHeight, 0.26),
+    MATS.wallPaint
+  );
+  wall.position.set((x1 + x2) / 2, elev + SETTINGS.floorHeight / 2, z);
+  wall.castShadow = !SETTINGS.performanceMode;
+  wall.receiveShadow = true;
+  scene.add(wall);
+
+  const skirt = new THREE.Mesh(new THREE.BoxGeometry(len, 0.15, 0.31), MATS.skirting);
+  skirt.position.set((x1 + x2) / 2, elev + 0.075, z);
+  scene.add(skirt);
 }
 
 function addOutdoorEnvironment() {
@@ -1814,6 +2195,7 @@ function addGroundClassroomBenchDeskLayout(room, elev) {
       }
       if (room.teacherTable) {
         addInstance('table', new THREE.Vector3(room.teacherTable.x, elev, room.teacherTable.z), room.teacherTable.yaw, new THREE.Vector3(1.45, 1, 0.55));
+        addDeskBooksAndFiles(room.teacherTable.x, room.teacherTable.z, room.teacherTable.yaw, elev, { width: 1.45, depth: 0.55 });
         addCollisionBox(room.teacherTable.x, room.teacherTable.z, 1.45, 0.55, room.teacherTable.yaw, elev - 0.05, elev + 0.85);
       }
       return;
@@ -1866,6 +2248,240 @@ function localToWorld2D(cx, cz, yaw, lx, lz) {
     x: cx + ca * lx + sa * lz,
     z: cz - sa * lx + ca * lz
   };
+}
+
+function addDeskBooksAndFiles(cx, cz, yaw, elev, options = {}) {
+  const width = options.width ?? 1.0;
+  const depth = options.depth ?? 0.7;
+  if (width < 0.55 || depth < 0.38) return;
+
+  const group = new THREE.Group();
+  group.position.set(cx, elev, cz);
+  group.rotation.y = yaw;
+
+  const colors = options.colors || [0x1d4ed8, 0xb91c1c, 0x15803d];
+  for (let n = 0; n < 3; n++) {
+    const book = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.min(0.28, width * 0.20), 0.035, Math.min(0.20, depth * 0.24)),
+      new THREE.MeshStandardMaterial({ color: colors[n % colors.length], roughness: 0.62 })
+    );
+    book.position.set(width * 0.24, 0.79 + n * 0.036, -depth * 0.18 + n * 0.018);
+    book.rotation.y = 0.08 * n;
+    group.add(book);
+  }
+
+  const fileA = new THREE.Mesh(
+    new THREE.BoxGeometry(Math.min(0.36, width * 0.28), 0.026, Math.min(0.25, depth * 0.34)),
+    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.58 })
+  );
+  fileA.position.set(-width * 0.22, 0.80, depth * 0.18);
+  fileA.rotation.y = -0.16;
+  const fileB = fileA.clone();
+  fileB.material = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.58 });
+  fileB.position.set(-width * 0.16, 0.83, depth * 0.12);
+  fileB.rotation.y = -0.08;
+  group.add(fileA, fileB);
+
+  scene.add(group);
+}
+
+function addFacultyCabin(cx, cz, yaw, elev) {
+  const deskOffsets = [-0.80, 0.80];
+  deskOffsets.forEach((lx) => {
+    const desk = localToWorld2D(cx, cz, yaw, lx, 0.38);
+    addInstance('table', new THREE.Vector3(desk.x, elev, desk.z), yaw, new THREE.Vector3(1.28, 1, 0.76));
+    addCollisionBox(desk.x, desk.z, 1.28, 0.76, yaw, elev - 0.05, elev + 0.82);
+  });
+
+  const group = new THREE.Group();
+  group.position.set(cx, elev, cz);
+  group.rotation.y = yaw;
+
+  const dividerMat = new THREE.MeshStandardMaterial({ color: 0xb7c1cc, roughness: 0.42, metalness: 0.08 });
+  const halfWallMat = new THREE.MeshStandardMaterial({ color: 0x87919b, roughness: 0.55, metalness: 0.05 });
+  const deskPropMat = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.48, metalness: 0.02 });
+  const bookMats = [
+    new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 }),
+    new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.6 }),
+    new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 })
+  ];
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xc7ecff,
+    transparent: true,
+    opacity: 0.38,
+    roughness: 0.04,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+
+  const divider = new THREE.Mesh(new THREE.BoxGeometry(0.075, 1.62, 1.62), dividerMat);
+  divider.position.set(0, 1.20, 0.02);
+  divider.castShadow = true;
+  divider.receiveShadow = true;
+  group.add(divider);
+
+  const addHalfGlassWall = (x, z, w, d, rot = 0) => {
+    const panel = new THREE.Group();
+    panel.position.set(x, 0, z);
+    panel.rotation.y = rot;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, 1.00, d), halfWallMat);
+    base.position.y = 0.50;
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(w, 1.22, Math.max(0.018, d * 0.45)), glassMat);
+    glass.position.y = 1.60;
+    const topRail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.045, d + 0.025), MATS.metal);
+    topRail.position.y = 2.23;
+    panel.add(base, glass, topRail);
+    group.add(panel);
+  };
+
+  const addHalfWall = (x, z, w, d, rot = 0) => {
+    const panel = new THREE.Group();
+    panel.position.set(x, 0, z);
+    panel.rotation.y = rot;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, 1.00, d), halfWallMat);
+    base.position.y = 0.50;
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d + 0.025), MATS.metal);
+    cap.position.y = 1.02;
+    panel.add(base, cap);
+    group.add(panel);
+  };
+
+  addHalfGlassWall(0, -1.18, 3.20, 0.07);
+  addHalfGlassWall(-1.63, -0.12, 2.10, 0.07, Math.PI / 2);
+  addHalfGlassWall(1.63, -0.12, 2.10, 0.07, Math.PI / 2);
+  addHalfWall(-1.42, 1.00, 0.42, 0.07);
+  addHalfWall(-0.16, 1.00, 0.40, 0.07);
+  addHalfGlassWall(1.32, 1.00, 0.62, 0.07);
+
+  const doorJambL = new THREE.Mesh(new THREE.BoxGeometry(0.055, 2.24, 0.08), MATS.metal);
+  doorJambL.position.set(0.10, 1.12, 1.00);
+  const doorJambR = doorJambL.clone();
+  doorJambR.position.x = 1.00;
+  group.add(doorJambL, doorJambR);
+
+  deskOffsets.forEach((lx, deskIdx) => {
+    const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.24, 0.035), MATS.pcScreen);
+    monitor.position.set(lx - 0.13, 0.96, 0.16);
+    monitor.rotation.x = -0.08;
+    const monitorStand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.15, 0.045), MATS.metal);
+    monitorStand.position.set(lx - 0.13, 0.82, 0.19);
+    const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.13), deskPropMat);
+    keyboard.position.set(lx - 0.12, 0.79, 0.43);
+    group.add(monitor, monitorStand, keyboard);
+
+    for (let n = 0; n < 3; n++) {
+      const book = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.035, 0.18), bookMats[(deskIdx + n) % bookMats.length]);
+      book.position.set(lx + 0.25, 0.79 + n * 0.036, 0.18 + n * 0.02);
+      book.rotation.y = 0.08 * n;
+      group.add(book);
+    }
+
+    const file = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.025, 0.24),
+      new THREE.MeshStandardMaterial({ color: deskIdx === 0 ? 0xfacc15 : 0x38bdf8, roughness: 0.55 })
+    );
+    file.position.set(lx + 0.20, 0.80, 0.50);
+    file.rotation.y = -0.12;
+    group.add(file);
+  });
+
+  const makeCabinChair = (x, z) => {
+    const chair = new THREE.Group();
+    chair.position.set(x, 0, z);
+    const seatMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.48, metalness: 0.08 });
+    const legMat = MATS.metal;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.12, 0.62), seatMat);
+    seat.position.y = 0.52;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.82, 0.09), seatMat);
+    back.position.set(0, 0.96, -0.31);
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.56), seatMat);
+    armL.position.set(-0.39, 0.72, 0.02);
+    const armR = armL.clone();
+    armR.position.x = 0.39;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.52, 10), legMat);
+    base.position.y = 0.26;
+    const footA = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.04, 0.05), legMat);
+    footA.position.y = 0.04;
+    const footB = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 0.84), legMat);
+    footB.position.y = 0.04;
+    chair.add(seat, back, armL, armR, base, footA, footB);
+    group.add(chair);
+  };
+
+  makeCabinChair(-0.80, -0.78);
+  makeCabinChair(0.80, -0.78);
+
+  const door = new THREE.Group();
+  door.position.set(0.55, 0, 1.01);
+  const doorFrameMat = MATS.metal;
+  door.rotation.y = -0.55;
+  const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(0.82, 1.94, 0.034), glassMat);
+  doorGlass.position.y = 1.12;
+  const doorTop = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.045, 0.07), doorFrameMat);
+  doorTop.position.y = 2.12;
+  const doorSide = new THREE.Mesh(new THREE.BoxGeometry(0.045, 2.02, 0.07), doorFrameMat);
+  doorSide.position.set(-0.46, 1.10, 0);
+  const doorSideR = doorSide.clone();
+  doorSideR.position.x = 0.46;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16), MATS.metal);
+  handle.rotation.x = Math.PI / 2;
+  handle.position.set(0.31, 1.10, 0.05);
+  door.add(doorGlass, doorTop, doorSide, doorSideR, handle);
+  group.add(door);
+
+  const doorHeader = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.05, 0.08), MATS.metal);
+  doorHeader.position.set(0.55, 2.22, 1.00);
+  group.add(doorHeader);
+
+  scene.add(group);
+
+  const dividerWorld = localToWorld2D(cx, cz, yaw, 0, 0);
+  addCollisionBox(dividerWorld.x, dividerWorld.z, 0.08, 1.45, yaw, elev - 0.05, elev + 1.95);
+  const backWorld = localToWorld2D(cx, cz, yaw, 0, -1.18);
+  addCollisionBox(backWorld.x, backWorld.z, 3.20, 0.09, yaw, elev - 0.05, elev + 1.95);
+  const leftWorld = localToWorld2D(cx, cz, yaw, -1.63, -0.12);
+  addCollisionBox(leftWorld.x, leftWorld.z, 0.09, 2.10, yaw, elev - 0.05, elev + 1.95);
+  const rightWorld = localToWorld2D(cx, cz, yaw, 1.63, -0.12);
+  addCollisionBox(rightWorld.x, rightWorld.z, 0.09, 2.10, yaw, elev - 0.05, elev + 1.95);
+  const chairLeftWorld = localToWorld2D(cx, cz, yaw, -0.80, -0.70);
+  addCollisionBox(chairLeftWorld.x, chairLeftWorld.z, 0.62, 0.58, yaw, elev - 0.05, elev + 1.15);
+  const chairRightWorld = localToWorld2D(cx, cz, yaw, 0.80, -0.70);
+  addCollisionBox(chairRightWorld.x, chairRightWorld.z, 0.62, 0.58, yaw, elev - 0.05, elev + 1.15);
+}
+
+function addFacultyCabinsForFloor(floorKey, elev) {
+  if (!['1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'].includes(floorKey)) return;
+
+  const byFloor = {
+    '1stfloor': [
+      { x: 42.35, z: 16.78, yaw: 0 },
+      { x: 42.35, z: 7.48, yaw: 0 },
+      { x: 42.35, z: -1.88, yaw: 0 },
+      { x: 54.10, z: 7.48, yaw: 0 },
+      { x: 54.10, z: -1.88, yaw: 0 }
+    ],
+    '2ndfloor': [
+      { x: 42.35, z: 7.48, yaw: 0 },
+      { x: 42.35, z: -1.88, yaw: 0 },
+      { x: 54.10, z: 7.48, yaw: 0 },
+      { x: 54.10, z: -1.88, yaw: 0 }
+    ],
+    '4thfloor': [
+      { x: 42.35, z: -1.88, yaw: 0 },
+      { x: 54.10, z: 7.48, yaw: 0 },
+      { x: 54.10, z: -1.88, yaw: 0 }
+    ],
+    '5thfloor': [
+      { x: 42.35, z: 16.78, yaw: 0 },
+      { x: 42.35, z: 7.48, yaw: 0 },
+      { x: 42.35, z: -1.88, yaw: 0 },
+      { x: 54.10, z: 7.48, yaw: 0 },
+      { x: 54.10, z: -1.88, yaw: 0 }
+    ]
+  };
+
+  (byFloor[floorKey] || []).forEach((placement) => addFacultyCabin(placement.x, placement.z, placement.yaw, elev));
 }
 
 function addLibraryBookshelf(cx, cz, yaw, elev, width, depth, options = {}) {
@@ -2112,6 +2728,7 @@ function addServerRoomInterior(elev) {
   addStorageCupboard(39.98, 12.25, Math.PI / 2, elev, 0.85);
 
   addInstance('table', new THREE.Vector3(44.45, elev, 11.35), Math.PI, new THREE.Vector3(1.15, 1, 0.65));
+  addDeskBooksAndFiles(44.45, 11.35, Math.PI, elev, { width: 1.15, depth: 0.65 });
   addCollisionBox(44.45, 11.35, 1.15, 0.65, Math.PI, elev - 0.05, elev + 0.85);
   addInstance('pcBody', new THREE.Vector3(44.45, elev, 11.35), Math.PI);
   addInstance('pcScreen', new THREE.Vector3(44.45, elev, 11.35), Math.PI);
@@ -2349,6 +2966,15 @@ function isTopStripCorridorGlassWall(floorKey, s) {
   return verticalRun && insideMainCorridorLength && (leftRoomFront || rightRoomFront);
 }
 
+function isThirdFloorClassroom301BigGlassWall(floorKey, s) {
+  if (!['1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'].includes(floorKey)) return false;
+  const midX = (s.x1 + s.x2) * 0.5;
+  const midZ = (s.z1 + s.z2) * 0.5;
+  const horizontalRun = Math.abs(s.z2 - s.z1) < 0.18;
+  const besideClassroom301Front = Math.abs(midZ - 24.66) < 0.28 && midX > 46.9 && midX < 54.2;
+  return horizontalRun && besideClassroom301Front;
+}
+
 function shouldOmitSecondFloorCorridorGlassPanel(s, panelMidZ) {
   const midX = (s.x1 + s.x2) * 0.5;
   const leftRoomFront = Math.abs(midX - 46.83) < 0.32;
@@ -2545,6 +3171,7 @@ async function loadWorld() {
   let secondFloorSpawn = null;
   const floorSafeSpawns = [];
   let sharedLiftAnchor = null;
+  let sharedNoticeBoardAnchor = null;
   let topElev = 0;
   
   for(let i=0; i<ALL_FLOORS.length; i++) {
@@ -2585,6 +3212,10 @@ async function loadWorld() {
       const safeZ = THREE.MathUtils.clamp(6.0, minZ + 2.0, maxZ - 2.0);
       floorSafeSpawns[i] = new THREE.Vector3(safeX, elev + SETTINGS.playerHeight, safeZ);
     }
+    const floorLabelMap = ALL_FLOORS[i] === 'groundgloor'
+      ? buildGroundFloorDoorLabelMap(dD)
+      : buildUpperFloorCorridorDoorLabelMap(ALL_FLOORS[i], dD);
+
     floorDataMap.set(ALL_FLOORS[i], {
       bounds: {
         minX: minX - 1.2,
@@ -2593,14 +3224,14 @@ async function loadWorld() {
         maxZ: maxZ + 1.2
       },
       walls: wD.map((w) => ({ x1: w.p1.x, z1: w.p1.z, x2: w.p2.x, z2: w.p2.z })),
-      doors: dD.map((d) => {
+      doors: dD.map((d, index) => {
         const x = toWorld(d.x);
         const z = toWorld(d.y);
         const w = toWorld(d.width || 0.8);
         const angle = -parseFloat(d.angle || 0);
         const dx = Math.cos(angle) * w * 0.5;
         const dz = Math.sin(angle) * w * 0.5;
-        return { x1: x - dx, z1: z - dz, x2: x + dx, z2: z + dz };
+        return { index, x, z, x1: x - dx, z1: z - dz, x2: x + dx, z2: z + dz, label: floorLabelMap.get(index) || '' };
       }),
       windows: (winD || []).map((win) => {
         const x = toWorld(win.x);
@@ -2640,44 +3271,69 @@ async function loadWorld() {
         .filter(Boolean)
     });
 
-    const groundMainEntranceDoorIndex = ALL_FLOORS[i] === 'groundgloor'
-      ? (() => {
-          const boundaryTol = 0.25;
-          let bestIdx = -1;
-          let bestScore = -Infinity;
-          for (let di = 0; di < dD.length; di++) {
-            const dx = toWorld(dD[di].x);
-            const dz = toWorld(dD[di].y);
-            const dw = toWorld(dD[di].width || 0);
-            if (!Number.isFinite(dx) || !Number.isFinite(dz) || !Number.isFinite(dw)) continue;
+    const mainEntranceDoorIndex = (() => {
+      const boundaryTol = 0.25;
+      let bestIdx = -1;
+      let bestScore = -Infinity;
+      for (let di = 0; di < dD.length; di++) {
+        const dx = toWorld(dD[di].x);
+        const dz = toWorld(dD[di].y);
+        const dw = toWorld(dD[di].width || 0);
+        if (!Number.isFinite(dx) || !Number.isFinite(dz) || !Number.isFinite(dw)) continue;
 
-            const onBoundary =
-              Math.abs(dz - maxZ) < boundaryTol ||
-              Math.abs(dz - minZ) < boundaryTol ||
-              Math.abs(dx - maxX) < boundaryTol ||
-              Math.abs(dx - minX) < boundaryTol;
+        const onBoundary =
+          Math.abs(dz - maxZ) < boundaryTol ||
+          Math.abs(dz - minZ) < boundaryTol ||
+          Math.abs(dx - maxX) < boundaryTol ||
+          Math.abs(dx - minX) < boundaryTol;
 
-            if (!onBoundary) continue;
+        if (!onBoundary) continue;
 
-            // Prefer widest facade door (front entrance).
-            const score = dw;
-            if (score > bestScore) { bestScore = score; bestIdx = di; }
-          }
-          return bestIdx;
-        })()
-      : -1;
+        // Prefer widest facade door (front entrance).
+        const score = dw;
+        if (score > bestScore) { bestScore = score; bestIdx = di; }
+      }
+      return bestIdx;
+    })();
 
-    if (ALL_FLOORS[i] === 'groundgloor' && groundMainEntranceDoorIndex >= 0 && dD[groundMainEntranceDoorIndex]) {
-      const mainDoor = dD[groundMainEntranceDoorIndex];
-      const dx = toWorld(mainDoor.x);
-      const dz = toWorld(mainDoor.y);
-      const ang = -toNum(mainDoor.angle, 0);
-      // Spawn slightly inside corridor from the main gate.
-      spawnPoint = new THREE.Vector3(
-        dx - Math.sin(ang) * 2.0,
-        SETTINGS.playerHeight,
-        dz - Math.cos(ang) * 2.0
+    const noticeAnchor = (() => {
+      if (mainEntranceDoorIndex >= 0 && dD[mainEntranceDoorIndex]) {
+        const mainDoor = dD[mainEntranceDoorIndex];
+        return {
+          dx: toWorld(mainDoor.x),
+          dz: toWorld(mainDoor.y),
+          ang: -toNum(mainDoor.angle, 0)
+        };
+      }
+      return sharedNoticeBoardAnchor;
+    })();
+
+    if (noticeAnchor) {
+      const { dx, dz, ang } = noticeAnchor;
+      const mainDoor = dD[mainEntranceDoorIndex];
+      const noticeRight = new THREE.Vector3(Math.cos(ang), 0, -Math.sin(ang));
+      const noticeNormal = new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang));
+      const noticePos = new THREE.Vector3(
+        dx - noticeRight.x * 2.55 + noticeNormal.x * 0.16,
+        elev + 1.72,
+        dz - noticeRight.z * 2.55 + noticeNormal.z * 0.16
       );
+      addNoticeBoard(noticePos, ang, ALL_FLOORS[i]);
+      if (ALL_FLOORS[i] === 'groundgloor') {
+        sharedNoticeBoardAnchor = noticeAnchor;
+        // Spawn slightly inside corridor from the main gate.
+        spawnPoint = new THREE.Vector3(
+          dx - Math.sin(ang) * 2.0,
+          SETTINGS.playerHeight,
+          dz - Math.cos(ang) * 2.0
+        );
+        const vendingPos = new THREE.Vector3(
+          dx - noticeRight.x * 3.65 + noticeNormal.x * 0.58,
+          elev,
+          dz - noticeRight.z * 3.65 + noticeNormal.z * 0.58
+        );
+        addVendingMachine(vendingPos, ang);
+      }
     }
     
     if(wD.length > 0) {
@@ -2818,28 +3474,44 @@ async function loadWorld() {
       }
     }
 
-    const wallOpenings = dD.map((d) => ({
-      x: toWorld(d.x),
-      z: toWorld(d.y),
-      w: Math.max(0.9, toWorld(d.width || 100))
-    }));
+    const wallOpenings = dD.map((d, dIndex) => {
+      const isMainEntrance = dIndex === mainEntranceDoorIndex;
+      return {
+        doorIndex: dIndex,
+        isMainEntrance,
+        x: toWorld(d.x),
+        z: toWorld(d.y),
+        w: getEffectiveDoorWidth(ALL_FLOORS[i], dIndex, d, floorLabelMap.get(dIndex) || '', isMainEntrance)
+      };
+    });
     if (sharedLiftAnchor) {
       wallOpenings.push({
         x: sharedLiftAnchor.x,
         z: sharedLiftAnchor.z,
-        w: 1.6
+        w: 1.6,
+        alwaysOpen: true
       });
     }
-    if (ALL_FLOORS[i] === 'groundgloor' && groundMainEntranceDoorIndex >= 0 && dD[groundMainEntranceDoorIndex]) {
-      const mainDoor = dD[groundMainEntranceDoorIndex];
+    if (ALL_FLOORS[i] === 'groundgloor' && mainEntranceDoorIndex >= 0 && dD[mainEntranceDoorIndex]) {
+      const mainDoor = dD[mainEntranceDoorIndex];
       wallOpenings.push({
         x: toWorld(mainDoor.x),
         z: toWorld(mainDoor.y),
-        w: 1.5
+        w: 1.5,
+        alwaysOpen: true
       });
     }
     wallOpenings.forEach((op) => {
-      GLOBAL_COLLISION.addClearance(op.x, op.z, Math.max(0.75, op.w / 2 + 0.45), elev - 0.1, elev + 2.25);
+      op.clearance = {
+        x: op.x,
+        z: op.z,
+        r: Math.max(0.58, op.w / 2 + 0.10),
+        yMin: elev - 0.1,
+        yMax: elev + 2.25,
+        active: !!(op.alwaysOpen || op.isMainEntrance),
+        doorControlled: !(op.alwaysOpen || op.isMainEntrance)
+      };
+      GLOBAL_COLLISION.clearances.push(op.clearance);
     });
 
     wD.forEach(w => {
@@ -2906,7 +3578,7 @@ async function loadWorld() {
       segments.forEach(s => {
         const slen = Math.hypot(s.x2-s.x1, s.z2-s.z1); if(slen < 0.001) return;
         const a = -Math.atan2(s.z2-s.z1, s.x2-s.x1);
-        if (isUpperFloorCorridorGlassWall(ALL_FLOORS[i], s)) {
+        if (isUpperFloorCorridorGlassWall(ALL_FLOORS[i], s) || isThirdFloorClassroom301BigGlassWall(ALL_FLOORS[i], s)) {
           addUpperFloorCorridorGlassWallSegment(ALL_FLOORS[i], s, elev, thick, corridorBaseGeos, corridorGlassGeos, corridorFrameGeos, skirtGeos, wallGeos);
         } else if (isTopStripCorridorGlassWall(ALL_FLOORS[i], s)) {
           addTopStripCorridorGlassWallSegment(s, elev, thick, h, wallGeos, corridorGlassGeos, corridorFrameGeos, skirtGeos);
@@ -2959,6 +3631,7 @@ async function loadWorld() {
          const scale = new THREE.Vector3(w, 1, d);
          // Use raw angle from JSON (with sign fix) - hardcoded +PI/2 often broke manual placements
          addInstance('table', pos, ang, scale);
+         if (!n.includes('rack')) addDeskBooksAndFiles(x, z, ang, elev, { width: w, depth: d });
       }
       else if(n.includes('laptop')) {
         const support = tableSurfaces.find((t) => pointInRotatedRect(x, z, t.x, t.z, t.w + 0.08, t.d + 0.08, t.ang));
@@ -3013,17 +3686,18 @@ async function loadWorld() {
     } else if (ALL_FLOORS[i] === '3rdfloor') {
       THIRD_FLOOR_CLASSROOM_BENCH_LAYOUTS.forEach((room) => addGroundClassroomBenchDeskLayout(room, elev));
     }
-    addLabChartsForFloor(ALL_FLOORS[i], elev);
+    addFacultyCabinsForFloor(ALL_FLOORS[i], elev);
+    addLabChartsForFloor(ALL_FLOORS[i], elev, wD);
 
     const classroomSmartBoardsPlaced = new Set();
     dD.forEach((d, dIndex) => {
       if (isSecondFloorDuplicateLibraryDoor(ALL_FLOORS[i], dIndex, d)) return;
       if (isFourthFloorDuplicateMeetingRoomDoor(ALL_FLOORS[i], dIndex, d)) return;
-      const x=toWorld(d.x), z=toWorld(d.y), w=toWorld(d.width || 100), h=2.1, ang=-toNum(d.angle,0); 
+      const isMainEntrance = dIndex === mainEntranceDoorIndex;
+      const x=toWorld(d.x), z=toWorld(d.y), w=getEffectiveDoorWidth(ALL_FLOORS[i], dIndex, d, floorLabelMap.get(dIndex) || '', isMainEntrance), h=2.1, ang=-toNum(d.angle,0); 
       const dObj = new THREE.Group(); dObj.position.set(x, elev, z); dObj.rotation.y = ang;
       const leafGroup = new THREE.Group();
       const doorThickness = 0.05;
-      const isMainEntrance = ALL_FLOORS[i] === 'groundgloor' && dIndex === groundMainEntranceDoorIndex;
       const leafW = isMainEntrance ? Math.max(1.8, w) : Math.max(0.9, Math.min(1.35, w));
 
       if (isMainEntrance) {
@@ -3087,6 +3761,19 @@ async function loadWorld() {
 
         const colW = { x1: x - Math.cos(ang)*w/2, z1: z + Math.sin(ang)*w/2, x2: x + Math.cos(ang)*w/2, z2: z - Math.sin(ang)*w/2, half: 0.12, yMin: elev, yMax: elev+doorH, active: true, isDoor: true };
         GLOBAL_COLLISION.walls.push(colW);
+        const exitBarrier = {
+          x1: x - Math.cos(ang) * (w / 2 + 0.08),
+          z1: z + Math.sin(ang) * (w / 2 + 0.08),
+          x2: x + Math.cos(ang) * (w / 2 + 0.08),
+          z2: z - Math.sin(ang) * (w / 2 + 0.08),
+          half: 0.22,
+          yMin: elev - 0.05,
+          yMax: elev + doorH + 0.05,
+          active: true,
+          isDoor: true,
+          permanentExitBarrier: true
+        };
+        GLOBAL_COLLISION.walls.push(exitBarrier);
         const sideBlockers = addDoorJambBlockers(x, z, w, ang, elev - 0.05, elev + doorH + 0.05, {
           length: 0.82,
           half: 0.14
@@ -3195,9 +3882,10 @@ async function loadWorld() {
       // Nameplates/boards removed per request.
       
       const hit = new THREE.Mesh(new THREE.BoxGeometry(w+0.2, h, 0.4), new THREE.MeshBasicMaterial({visible:false})); hit.position.y = h/2;
-      const colW = { x1: x - Math.cos(ang)*w/2, z1: z + Math.sin(ang)*w/2, x2: x + Math.cos(ang)*w/2, z2: z - Math.sin(ang)*w/2, half: 0.1, yMin: elev, yMax: elev+h, active: true, isDoor: true };
+      const colW = { x1: x - Math.cos(ang)*w/2, z1: z + Math.sin(ang)*w/2, x2: x + Math.cos(ang)*w/2, z2: z - Math.sin(ang)*w/2, half: 0.32, yMin: elev, yMax: elev+h, active: true, isDoor: true };
       GLOBAL_COLLISION.walls.push(colW);
-      const sideBlockers = addDoorJambBlockers(x, z, w, ang, elev - 0.05, elev + h + 0.05);
+      const sideBlockers = addDoorJambBlockers(x, z, w, ang, elev - 0.05, elev + h + 0.05, { length: 1.05, half: 0.18, inset: 0.0 });
+      const doorClearance = wallOpenings.find((op) => op.doorIndex === dIndex)?.clearance || null;
       hit.userData = {
         type:'door',
         isOpen:false,
@@ -3206,6 +3894,7 @@ async function loadWorld() {
         lockedMessage:'',
         colW,
         sideBlockers,
+        clearance: doorClearance,
         toggle(){
           if (this.locked) {
             setStatus(this.lockedMessage || 'Admin access required');
@@ -3215,6 +3904,7 @@ async function loadWorld() {
           this.isOpen=!this.isOpen;
           this.targetRot=this.isOpen?Math.PI*0.6:0;
           this.colW.active=!this.isOpen;
+          if (this.clearance) this.clearance.active = this.isOpen;
           this.sideBlockers.forEach((b) => { b.active = true; });
           setStatus(this.isOpen ? 'Door opened' : 'Door closed');
           playTone(this.isOpen ? 480 : 360, 0.08);
@@ -3362,6 +4052,7 @@ async function loadWorld() {
 
     addWindowsFromSourceData(winD, elev);
     addExteriorWindowsForFloor(ALL_FLOORS[i], elev);
+    addTopCorridorSolidWallPatch(ALL_FLOORS[i], elev);
 
     if (!SETTINGS.performanceMode) {
       const l1 = new THREE.PointLight(0xffeedd, 0.8, 15); l1.position.set(40, elev + 3.0, 5); scene.add(l1);
@@ -3451,9 +4142,9 @@ class FPSController {
     const floorY = col.getHeight(this.pos);
     this.pos.y = THREE.MathUtils.lerp(this.pos.y, floorY + SETTINGS.playerHeight, 0.22);
     this.camera.position.copy(this.pos);
-    const zInfo = getZone(this.pos.x, this.pos.z);
     const floorIdx = Math.round((this.pos.y - SETTINGS.playerHeight) / SETTINGS.floorHeight);
     const clampedFloorIdx = Math.max(0, Math.min(FLOOR_LABELS.length - 1, floorIdx));
+    const zInfo = getZone(this.pos, clampedFloorIdx * SETTINGS.floorHeight);
     if (performance.now() > statusOverrideUntil) {
       UI.zoneName.innerText = `${FLOOR_LABELS[clampedFloorIdx]} - ${zInfo.name}`;
     }
@@ -3744,6 +4435,7 @@ async function init() {
     });
 
     updateStorm(dt, t);
+    updateExplorerHud(world);
     if (arState.preview?.group) arState.preview.group.rotation.y += dt * 0.22;
     if (!renderer.xr.isPresenting) drawSimulationMinimap();
     renderer.render(scene, camera);
