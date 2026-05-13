@@ -1620,6 +1620,35 @@ function addLabChartsForFloor(floorKey, elev, walls = []) {
   });
 }
 
+function addGymkhanaSportsPostersForFloor(floorKey, elev, walls = []) {
+  if (floorKey !== 'groundgloor') return;
+
+  const posters = [
+    ['CRICKET LEGENDS', ['Sachin Tendulkar', 'MS Dhoni', 'Virat Kohli'], '#22c55e'],
+    ['ATHLETICS', ['Milkha Singh', 'P. T. Usha', 'Neeraj Chopra'], '#f97316'],
+    ['COURT SPORTS', ['P. V. Sindhu', 'Saina Nehwal', 'Leander Paes'], '#0ea5e9'],
+    ['TEAM SPORTS', ['Football', 'Basketball', 'Volleyball'], '#ef4444']
+  ];
+
+  const placements = [
+    { x: 46.83, z: 10.10, yaw: -Math.PI / 2 },
+    { x: 46.83, z: 16.70, yaw: -Math.PI / 2 },
+    { x: 43.35, z: 10.10, yaw: Math.PI / 2 },
+    { x: 43.35, z: 16.70, yaw: Math.PI / 2 }
+  ];
+
+  placements.forEach((placement, idx) => {
+    const poster = posters[idx % posters.length];
+    const seed = new THREE.Vector3(placement.x, elev + 1.68, placement.z);
+    const mount = snapWallMountToWall(seed, placement.yaw, walls, { maxDistance: 0.65 });
+    addWallChart(poster[0], poster[1], mount.position, mount.yaw, {
+      accent: poster[2],
+      width: 1.12,
+      height: 0.78
+    });
+  });
+}
+
 function getDoorNameplateWidth(text) {
   const len = String(text || '').length;
   if (len > 24) return 1.85;
@@ -3688,6 +3717,7 @@ async function loadWorld() {
     }
     addFacultyCabinsForFloor(ALL_FLOORS[i], elev);
     addLabChartsForFloor(ALL_FLOORS[i], elev, wD);
+    addGymkhanaSportsPostersForFloor(ALL_FLOORS[i], elev, wD);
 
     const classroomSmartBoardsPlaced = new Set();
     dD.forEach((d, dIndex) => {
