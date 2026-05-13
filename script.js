@@ -1631,17 +1631,18 @@ function addGymkhanaSportsPostersForFloor(floorKey, elev, walls = []) {
   ];
 
   const placements = [
-    { x: 46.83, z: 10.10, yaw: -Math.PI / 2 },
-    { x: 46.83, z: 16.70, yaw: -Math.PI / 2 },
-    { x: 43.35, z: 10.10, yaw: Math.PI / 2 },
-    { x: 43.35, z: 16.70, yaw: Math.PI / 2 }
+    // Gymkhana front wall, kept out of the NSS span.
+    { x: 42.15, z: 18.28, yaw: 0 },
+    { x: 44.35, z: 18.28, yaw: 0 },
+    // Gymkhana interior side wall.
+    { x: 42.72, z: 17.05, yaw: Math.PI / 2 },
+    // Gymkhana outer wall facing the corridor.
+    { x: 42.72, z: 15.92, yaw: -Math.PI / 2 }
   ];
 
   placements.forEach((placement, idx) => {
     const poster = posters[idx % posters.length];
-    const seed = new THREE.Vector3(placement.x, elev + 1.68, placement.z);
-    const mount = snapWallMountToWall(seed, placement.yaw, walls, { maxDistance: 0.65 });
-    addWallChart(poster[0], poster[1], mount.position, mount.yaw, {
+    addWallChart(poster[0], poster[1], new THREE.Vector3(placement.x, elev + 1.68, placement.z), placement.yaw, {
       accent: poster[2],
       width: 1.12,
       height: 0.78
