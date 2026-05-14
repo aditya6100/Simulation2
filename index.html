@@ -51,6 +51,11 @@
             <option value="groundgloor">Ground Floor</option>
           </select>
         </div>
+        <div class="panel-title" style="margin-top:10px;">Augmented View</div>
+        <div class="panel-body">
+          <button id="arFloorBtn" class="panel-action-btn" type="button">Show Floor in AR</button>
+          <div id="arStatus" class="panel-status">2m floor model</div>
+        </div>
         <div class="panel-title" style="margin-top:10px;">Quality</div>
         <div class="panel-body">
           <select id="qualitySelect">
@@ -109,6 +114,7 @@
           <button id="startBtn" type="button">Enter Simulation</button>
           <div class="welcome-actions">
             <a href="navigation.html" class="secondary-action">Go to AR Navigation</a>
+            <button id="arFloorBtnOverlay" class="secondary-action action-button" type="button">Show Selected Floor in AR</button>
           </div>
           <div class="overlay-hint">Audio, physics, and controls initialize after you enter.</div>
         </div>

@@ -25,6 +25,9 @@ const UI = {
   zoneName: document.getElementById('zoneName'),
   floorSelect: document.getElementById('floorSelect'),
   floorSelectOverlay: document.getElementById('floorSelectOverlay'),
+  arFloorBtn: document.getElementById('arFloorBtn'),
+  arFloorBtnOverlay: document.getElementById('arFloorBtnOverlay'),
+  arStatus: document.getElementById('arStatus'),
   qualitySelect: document.getElementById('qualitySelect'),
   minimapCanvas: document.getElementById('minimap-canvas'),
   liftDashboard: document.getElementById('liftDashboard'),
@@ -87,6 +90,13 @@ let liftTravelTimer = null;
 let liftTravelInProgress = false;
 let audioContext = null;
 let statusOverrideUntil = 0;
+const AR_FLOOR_SIZE_METERS = 2.0;
+const arState = {
+  session: null,
+  group: null,
+  hiddenObjects: [],
+  wasControllerEnabled: false
+};
 
 // --- 2. PHYSICS & COLLISION ---
 function CollisionSystem() {
@@ -238,6 +248,205 @@ function drawSimulationMinimap() {
   ctx.fillStyle = '#0f172a';
   ctx.font = `${11 * dpr}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillText(FLOOR_LABELS[floorIdx], 10 * dpr, 17 * dpr);
+}
+
+function getSelectedFloorIndex() {
+  if (!UI.floorSelect) return 4;
+  return Math.max(0, Math.min(ALL_FLOORS.length - 1, ALL_FLOORS.length - 1 - UI.floorSelect.selectedIndex));
+}
+
+function updateARStatus(message) {
+  if (UI.arStatus) UI.arStatus.textContent = message;
+}
+
+function createARTextSprite(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 42px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.82, 0.20, 1);
+  return sprite;
+}
+
+function createARFloorModel(floorIdx) {
+  const floorKey = ALL_FLOORS[floorIdx];
+  const floor = minimapWorld?.floorDataMap?.get(floorKey);
+  if (!floor) return null;
+
+  const group = new THREE.Group();
+  group.name = 'ar-floor-model';
+
+  const mapW = Math.max(0.01, floor.bounds.maxX - floor.bounds.minX);
+  const mapD = Math.max(0.01, floor.bounds.maxZ - floor.bounds.minZ);
+  const scale = AR_FLOOR_SIZE_METERS / Math.max(mapW, mapD);
+  const cx = (floor.bounds.minX + floor.bounds.maxX) * 0.5;
+  const cz = (floor.bounds.minZ + floor.bounds.maxZ) * 0.5;
+  const wallHeight = 0.09;
+  const wallThickness = 0.022;
+
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0xe8f4f2,
+    roughness: 0.62,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.88
+  });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.48, metalness: 0.05 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.38, metalness: 0.05 });
+  const edgeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.28 });
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(mapW * scale, 0.018, mapD * scale), floorMat);
+  base.position.y = 0;
+  base.receiveShadow = true;
+  group.add(base);
+
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(mapW * scale, 0.02, mapD * scale)),
+    edgeMat
+  );
+  edge.position.y = 0.012;
+  group.add(edge);
+
+  floor.walls.forEach((wall) => {
+    const x1 = (wall.x1 - cx) * scale;
+    const z1 = (wall.z1 - cz) * scale;
+    const x2 = (wall.x2 - cx) * scale;
+    const z2 = (wall.z2 - cz) * scale;
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    if (len < 0.01) return;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight, wallThickness), wallMat);
+    mesh.position.set((x1 + x2) * 0.5, wallHeight * 0.5 + 0.012, (z1 + z2) * 0.5);
+    mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
+
+  floor.doors.forEach((door) => {
+    const x1 = (door.x1 - cx) * scale;
+    const z1 = (door.z1 - cz) * scale;
+    const x2 = (door.x2 - cx) * scale;
+    const z2 = (door.z2 - cz) * scale;
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    if (len < 0.01) return;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 0.035, wallThickness * 1.25), doorMat);
+    mesh.position.set((x1 + x2) * 0.5, 0.042, (z1 + z2) * 0.5);
+    mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+    group.add(mesh);
+  });
+
+  const label = createARTextSprite(`${FLOOR_LABELS[floorIdx]} - 2m AR Model`);
+  label.position.set(0, 0.32, -mapD * scale * 0.5 - 0.18);
+  group.add(label);
+
+  group.position.set(0, 0.02, -1.65);
+  group.rotation.x = 0;
+  group.userData.floorKey = floorKey;
+  return group;
+}
+
+function setSceneForAR(enabled) {
+  if (enabled) {
+    arState.hiddenObjects = [];
+    scene.children.forEach((child) => {
+      if (child === camera || child === arState.group || child.isLight) return;
+      arState.hiddenObjects.push({ child, visible: child.visible });
+      child.visible = false;
+    });
+    return;
+  }
+  arState.hiddenObjects.forEach(({ child, visible }) => { child.visible = visible; });
+  arState.hiddenObjects = [];
+}
+
+async function startFloorAR() {
+  if (arState.session) {
+    await arState.session.end();
+    return;
+  }
+  if (!navigator.xr || !renderer?.xr) {
+    updateARStatus('AR requires a WebXR browser on a supported phone.');
+    setStatus('AR is not available in this browser', 2.5);
+    return;
+  }
+
+  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+  if (!supported) {
+    updateARStatus('Immersive AR is not supported on this device/browser.');
+    setStatus('Immersive AR not supported', 2.5);
+    return;
+  }
+
+  const floorIdx = getSelectedFloorIndex();
+  const group = createARFloorModel(floorIdx);
+  if (!group) {
+    updateARStatus('Selected floor data is not ready yet.');
+    return;
+  }
+
+  if (document.pointerLockElement) document.exitPointerLock();
+  arState.wasControllerEnabled = !!ctrl?.enabled;
+  if (ctrl) {
+    ctrl.enabled = false;
+    ctrl.resetInput();
+  }
+
+  arState.group = group;
+  scene.add(group);
+  setSceneForAR(true);
+  updateARStatus(`Opening ${FLOOR_LABELS[floorIdx]} as a 2m AR model...`);
+
+  try {
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      optionalFeatures: ['local-floor', 'dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+    arState.session = session;
+    renderer.xr.enabled = true;
+    await renderer.xr.setSession(session);
+    session.addEventListener('end', () => {
+      setSceneForAR(false);
+      if (arState.group) {
+        scene.remove(arState.group);
+        arState.group.traverse((obj) => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach((mat) => {
+              if (mat.map) mat.map.dispose();
+              mat.dispose();
+            });
+          }
+        });
+      }
+      arState.session = null;
+      arState.group = null;
+      if (ctrl) ctrl.enabled = arState.wasControllerEnabled && !!document.pointerLockElement;
+      updateARStatus('2m floor model');
+    });
+    updateARStatus(`${FLOOR_LABELS[floorIdx]} is showing in AR.`);
+  } catch (err) {
+    setSceneForAR(false);
+    scene.remove(group);
+    arState.group = null;
+    arState.session = null;
+    updateARStatus('AR session could not start.');
+    setStatus('AR session could not start', 2.5);
+    console.warn('AR session error:', err);
+  }
 }
 
 function setupFlashlight() {
@@ -755,12 +964,18 @@ function addWallChart(title, bullets, position, yaw, options = {}) {
   const width = options.width ?? 1.65;
   const height = options.height ?? 1.15;
   const accent = options.accent ?? '#0ea5e9';
+  const wallThickness = options.wallThickness ?? 0.25;
+  const wallInset = options.wallInset ?? 0.012;
+  const mountDepth = 0.045;
   const group = new THREE.Group();
   group.position.copy(position);
   group.rotation.y = yaw;
+  const wallOffset = (wallThickness * 0.5) + (mountDepth * 0.5) + wallInset;
+  group.position.x += Math.sin(yaw) * wallOffset;
+  group.position.z += Math.cos(yaw) * wallOffset;
 
   const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(width + 0.10, height + 0.10, 0.045),
+    new THREE.BoxGeometry(width + 0.10, height + 0.10, mountDepth),
     new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.55, metalness: 0.12 })
   );
   group.add(frame);
@@ -3027,6 +3242,7 @@ function setupMobileControls(ctrl) {
 
 async function init() {
   renderer = new THREE.WebGLRenderer({ antialias: !SETTINGS.performanceMode, powerPreference: "high-performance" });
+  renderer.xr.enabled = true;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, SETTINGS.performanceMode ? 0.75 : 1.35));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = !SETTINGS.performanceMode;
@@ -3057,6 +3273,8 @@ async function init() {
     applyQualityProfile(UI.qualitySelect.value);
     UI.qualitySelect.addEventListener('change', (e) => applyQualityProfile(e.target.value));
   }
+  if (UI.arFloorBtn) UI.arFloorBtn.addEventListener('click', startFloorAR);
+  if (UI.arFloorBtnOverlay) UI.arFloorBtnOverlay.addEventListener('click', startFloorAR);
   ctrl.pos.copy(world.floorSafeSpawns[4] || world.spawnPoint || new THREE.Vector3(50.0, SETTINGS.playerHeight, 0.0));
   ctrl.pos.y = 4 * SETTINGS.floorHeight + SETTINGS.playerHeight;
   if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
@@ -3091,6 +3309,7 @@ async function init() {
     if (safe) ctrl.pos.copy(safe);
     ctrl.pos.y = Math.max(0, fIdx) * SETTINGS.floorHeight + SETTINGS.playerHeight;
     ctrl.resetInput();
+    if (arState.session) updateARStatus(`${FLOOR_LABELS[fIdx]} selected. Restart AR to refresh model.`);
   });
   if (UI.floorSelectOverlay) {
     UI.floorSelectOverlay.addEventListener('change', (e) => {
@@ -3159,11 +3378,10 @@ async function init() {
   });
   window.addEventListener('resize', () => drawSimulationMinimap());
   function animate() {
-    requestAnimationFrame(animate);
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
 
-    if(ctrl.enabled) ctrl.update(dt, GLOBAL_COLLISION);
+    if(ctrl.enabled && !renderer.xr.isPresenting) ctrl.update(dt, GLOBAL_COLLISION);
 
     world.doorList.forEach(d => { d.pivot.rotation.y += (d.targetRot - d.pivot.rotation.y) * dt * 8; });
 
@@ -3194,9 +3412,9 @@ async function init() {
     });
 
     updateStorm(dt, t);
-    drawSimulationMinimap();
+    if (!renderer.xr.isPresenting) drawSimulationMinimap();
     renderer.render(scene, camera);
   }
-  animate();
+  renderer.setAnimationLoop(animate);
 }
 init().catch(err=>console.error("Engine Error:", err));
