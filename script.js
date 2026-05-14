@@ -95,7 +95,8 @@ const arState = {
   session: null,
   group: null,
   hiddenObjects: [],
-  wasControllerEnabled: false
+  wasControllerEnabled: false,
+  preview: null
 };
 
 // --- 2. PHYSICS & COLLISION ---
@@ -358,6 +359,19 @@ function createARFloorModel(floorIdx) {
   return group;
 }
 
+function disposeObjectTree(root) {
+  root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if (mat.map) mat.map.dispose();
+        mat.dispose();
+      });
+    }
+  });
+}
+
 function setSceneForAR(enabled) {
   if (enabled) {
     arState.hiddenObjects = [];
@@ -372,20 +386,94 @@ function setSceneForAR(enabled) {
   arState.hiddenObjects = [];
 }
 
+function closeFloorPreview() {
+  const preview = arState.preview;
+  if (!preview) return;
+
+  setSceneForAR(false);
+  scene.remove(preview.group);
+  disposeObjectTree(preview.group);
+  camera.position.copy(preview.cameraPosition);
+  camera.quaternion.copy(preview.cameraQuaternion);
+  camera.fov = preview.cameraFov;
+  camera.updateProjectionMatrix();
+  if (ctrl) ctrl.enabled = preview.controllerEnabled;
+  if (UI.overlay) UI.overlay.style.display = preview.overlayDisplay;
+  preview.panel.remove();
+  arState.preview = null;
+  arState.group = null;
+  updateARStatus('2m floor model');
+}
+
+function showFloorPreview(message) {
+  closeFloorPreview();
+
+  const floorIdx = getSelectedFloorIndex();
+  const group = createARFloorModel(floorIdx);
+  if (!group) {
+    updateARStatus('Selected floor data is not ready yet.');
+    return;
+  }
+
+  group.position.set(0, 0, 0);
+  group.rotation.y = -0.35;
+  scene.add(group);
+  arState.group = group;
+  setSceneForAR(true);
+
+  const panel = document.createElement('div');
+  panel.className = 'ar-preview-panel';
+  panel.innerHTML = `
+    <div>
+      <strong>${FLOOR_LABELS[floorIdx]} AR floor model</strong>
+      <span>${message || 'Showing 2m preview. Use a supported WebXR phone browser for camera AR.'}</span>
+    </div>
+    <button type="button" aria-label="Close AR floor preview">Close</button>
+  `;
+  document.body.appendChild(panel);
+  panel.querySelector('button').addEventListener('click', closeFloorPreview);
+
+  arState.preview = {
+    group,
+    panel,
+    cameraPosition: camera.position.clone(),
+    cameraQuaternion: camera.quaternion.clone(),
+    cameraFov: camera.fov,
+    controllerEnabled: !!ctrl?.enabled,
+    overlayDisplay: UI.overlay ? UI.overlay.style.display : ''
+  };
+
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (ctrl) {
+    ctrl.enabled = false;
+    ctrl.resetInput();
+  }
+  if (UI.overlay) UI.overlay.style.display = 'none';
+  window.setTimeout(() => {
+    if (arState.preview && UI.overlay) UI.overlay.style.display = 'none';
+  }, 0);
+
+  camera.fov = 52;
+  camera.position.set(0, 1.35, 2.65);
+  camera.lookAt(0, 0.04, 0);
+  camera.updateProjectionMatrix();
+  updateARStatus(message || `${FLOOR_LABELS[floorIdx]} is showing as a 2m preview.`);
+}
+
 async function startFloorAR() {
   if (arState.session) {
     await arState.session.end();
     return;
   }
   if (!navigator.xr || !renderer?.xr) {
-    updateARStatus('AR requires a WebXR browser on a supported phone.');
+    showFloorPreview('WebXR AR is not available here, so this is the 2m floor preview.');
     setStatus('AR is not available in this browser', 2.5);
     return;
   }
 
   const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
   if (!supported) {
-    updateARStatus('Immersive AR is not supported on this device/browser.');
+    showFloorPreview('Immersive AR is not supported here, so this is the 2m floor preview.');
     setStatus('Immersive AR not supported', 2.5);
     return;
   }
@@ -421,16 +509,7 @@ async function startFloorAR() {
       setSceneForAR(false);
       if (arState.group) {
         scene.remove(arState.group);
-        arState.group.traverse((obj) => {
-          if (obj.geometry) obj.geometry.dispose();
-          if (obj.material) {
-            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-            mats.forEach((mat) => {
-              if (mat.map) mat.map.dispose();
-              mat.dispose();
-            });
-          }
-        });
+        disposeObjectTree(arState.group);
       }
       arState.session = null;
       arState.group = null;
@@ -441,9 +520,10 @@ async function startFloorAR() {
   } catch (err) {
     setSceneForAR(false);
     scene.remove(group);
+    disposeObjectTree(group);
     arState.group = null;
     arState.session = null;
-    updateARStatus('AR session could not start.');
+    showFloorPreview('AR session could not start, so this is the 2m floor preview.');
     setStatus('AR session could not start', 2.5);
     console.warn('AR session error:', err);
   }
@@ -3310,6 +3390,7 @@ async function init() {
     ctrl.pos.y = Math.max(0, fIdx) * SETTINGS.floorHeight + SETTINGS.playerHeight;
     ctrl.resetInput();
     if (arState.session) updateARStatus(`${FLOOR_LABELS[fIdx]} selected. Restart AR to refresh model.`);
+    if (arState.preview) showFloorPreview(`${FLOOR_LABELS[fIdx]} is showing as a 2m preview.`);
   });
   if (UI.floorSelectOverlay) {
     UI.floorSelectOverlay.addEventListener('change', (e) => {
@@ -3412,6 +3493,7 @@ async function init() {
     });
 
     updateStorm(dt, t);
+    if (arState.preview?.group) arState.preview.group.rotation.y += dt * 0.22;
     if (!renderer.xr.isPresenting) drawSimulationMinimap();
     renderer.render(scene, camera);
   }
