@@ -53,8 +53,8 @@
         </div>
         <div class="panel-title" style="margin-top:10px;">Augmented View</div>
         <div class="panel-body">
-          <button id="arFloorBtn" class="panel-action-btn" type="button">Show Floor in AR</button>
-          <div id="arStatus" class="panel-status">2m floor model</div>
+          <button id="arFloorBtn" class="panel-action-btn" type="button">Floor in AR</button>
+          <div id="arStatus" class="panel-status">Select floor and start AR</div>
         </div>
         <div class="panel-title" style="margin-top:10px;">Quality</div>
         <div class="panel-body">
@@ -114,7 +114,7 @@
           <button id="startBtn" type="button">Enter Simulation</button>
           <div class="welcome-actions">
             <a href="navigation.html" class="secondary-action">Go to AR Navigation</a>
-            <button id="arFloorBtnOverlay" class="secondary-action action-button" type="button">Show Selected Floor in AR</button>
+            <button id="arFloorBtnOverlay" class="secondary-action action-button" type="button">Floor in AR</button>
           </div>
           <div class="overlay-hint">Audio, physics, and controls initialize after you enter.</div>
         </div>
@@ -138,6 +138,28 @@
         </div>
         <div id="liftButtons" class="lift-buttons" aria-label="Lift floor selection"></div>
         <button id="liftCloseBtn" class="lift-close-btn" type="button">Exit Lift</button>
+      </div>
+    </div>
+    <div id="arFloorDialog" aria-hidden="true">
+      <div class="ar-floor-card" role="dialog" aria-modal="true" aria-labelledby="arFloorTitle">
+        <div class="ar-floor-header">
+          <div>
+            <div class="panel-title" id="arFloorTitle">Floor in AR</div>
+            <strong>Choose floor model</strong>
+          </div>
+          <button id="arFloorClose" class="ar-icon-btn" type="button" aria-label="Close AR floor panel">x</button>
+        </div>
+        <label for="arFloorSelect">Floor Selection</label>
+        <select id="arFloorSelect">
+          <option value="5thfloor">5th Floor</option>
+          <option value="4thfloor" selected>4th Floor - Labs</option>
+          <option value="3rdfloor">3rd Floor</option>
+          <option value="2ndfloor">2nd Floor</option>
+          <option value="1stfloor">1st Floor</option>
+          <option value="groundgloor">Ground Floor</option>
+        </select>
+        <button id="arFloorStart" class="ar-start-btn" type="button">Start AR</button>
+        <p>Shows the selected floor as a compact 2m augmented model using the simulation floor data.</p>
       </div>
     </div>
     <div id="mobileControls" aria-hidden="true">

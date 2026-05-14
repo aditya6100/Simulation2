@@ -459,6 +459,100 @@ canvas{
   cursor: pointer;
 }
 
+#arFloorDialog{
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.36);
+  box-sizing: border-box;
+}
+
+#arFloorDialog.active{
+  display: flex;
+}
+
+.ar-floor-card{
+  width: min(390px, calc(100vw - 32px));
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.96);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+  padding: 18px;
+  box-sizing: border-box;
+  backdrop-filter: blur(14px);
+}
+
+.ar-floor-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ar-floor-header strong{
+  display: block;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.ar-icon-btn{
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(15,23,42,0.14);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.92);
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ar-floor-card label{
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#arFloorSelect{
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.96);
+  color: #0f172a;
+  padding: 10px 12px;
+  font: inherit;
+  margin-bottom: 14px;
+}
+
+.ar-start-btn{
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(15,118,110,0.55);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.ar-floor-card p{
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .ar-preview-panel{
   position: fixed;
   left: 50%;

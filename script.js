@@ -27,6 +27,10 @@ const UI = {
   floorSelectOverlay: document.getElementById('floorSelectOverlay'),
   arFloorBtn: document.getElementById('arFloorBtn'),
   arFloorBtnOverlay: document.getElementById('arFloorBtnOverlay'),
+  arFloorDialog: document.getElementById('arFloorDialog'),
+  arFloorSelect: document.getElementById('arFloorSelect'),
+  arFloorStart: document.getElementById('arFloorStart'),
+  arFloorClose: document.getElementById('arFloorClose'),
   arStatus: document.getElementById('arStatus'),
   qualitySelect: document.getElementById('qualitySelect'),
   minimapCanvas: document.getElementById('minimap-canvas'),
@@ -252,12 +256,36 @@ function drawSimulationMinimap() {
 }
 
 function getSelectedFloorIndex() {
-  if (!UI.floorSelect) return 4;
-  return Math.max(0, Math.min(ALL_FLOORS.length - 1, ALL_FLOORS.length - 1 - UI.floorSelect.selectedIndex));
+  const select = UI.arFloorSelect || UI.floorSelect;
+  if (!select) return 4;
+  const byValue = ALL_FLOORS.indexOf(select.value);
+  if (byValue >= 0) return byValue;
+  return Math.max(0, Math.min(ALL_FLOORS.length - 1, ALL_FLOORS.length - 1 - select.selectedIndex));
 }
 
 function updateARStatus(message) {
   if (UI.arStatus) UI.arStatus.textContent = message;
+}
+
+function syncARFloorSelectionFromMain() {
+  if (!UI.arFloorSelect || !UI.floorSelect) return;
+  UI.arFloorSelect.value = UI.floorSelect.value;
+}
+
+function openARFloorDialog() {
+  syncARFloorSelectionFromMain();
+  if (UI.arFloorDialog) {
+    UI.arFloorDialog.classList.add('active');
+    UI.arFloorDialog.setAttribute('aria-hidden', 'false');
+  }
+  updateARStatus('Choose a floor, then Start AR');
+}
+
+function closeARFloorDialog() {
+  if (UI.arFloorDialog) {
+    UI.arFloorDialog.classList.remove('active');
+    UI.arFloorDialog.setAttribute('aria-hidden', 'true');
+  }
 }
 
 function createARTextSprite(text) {
@@ -295,8 +323,8 @@ function createARFloorModel(floorIdx) {
   const scale = AR_FLOOR_SIZE_METERS / Math.max(mapW, mapD);
   const cx = (floor.bounds.minX + floor.bounds.maxX) * 0.5;
   const cz = (floor.bounds.minZ + floor.bounds.maxZ) * 0.5;
-  const wallHeight = 0.09;
-  const wallThickness = 0.022;
+  const wallHeight = Math.max(0.12, SETTINGS.floorHeight * scale * 0.9);
+  const wallThickness = 0.026;
 
   const floorMat = new THREE.MeshStandardMaterial({
     color: 0xe8f4f2,
@@ -306,7 +334,13 @@ function createARFloorModel(floorIdx) {
     opacity: 0.88
   });
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.48, metalness: 0.05 });
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.38, metalness: 0.05 });
+  const innerWallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.62, metalness: 0.02 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.42, metalness: 0.04 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.08, metalness: 0.02, transparent: true, opacity: 0.58 });
+  const deskMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.55, metalness: 0.04 });
+  const chairMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.06 });
+  const pcMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.36, metalness: 0.15 });
+  const fixtureMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.42, metalness: 0.08 });
   const edgeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.28 });
 
   const base = new THREE.Mesh(new THREE.BoxGeometry(mapW * scale, 0.018, mapD * scale), floorMat);
@@ -328,7 +362,7 @@ function createARFloorModel(floorIdx) {
     const z2 = (wall.z2 - cz) * scale;
     const len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.01) return;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight, wallThickness), wallMat);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight, wallThickness), innerWallMat);
     mesh.position.set((x1 + x2) * 0.5, wallHeight * 0.5 + 0.012, (z1 + z2) * 0.5);
     mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
     mesh.castShadow = true;
@@ -343,10 +377,53 @@ function createARFloorModel(floorIdx) {
     const z2 = (door.z2 - cz) * scale;
     const len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.01) return;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 0.035, wallThickness * 1.25), doorMat);
-    mesh.position.set((x1 + x2) * 0.5, 0.042, (z1 + z2) * 0.5);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight * 0.62, wallThickness * 1.35), doorMat);
+    mesh.position.set((x1 + x2) * 0.5, wallHeight * 0.31 + 0.018, (z1 + z2) * 0.5);
     mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
     group.add(mesh);
+  });
+
+  (floor.windows || []).forEach((win) => {
+    const x1 = (win.x1 - cx) * scale;
+    const z1 = (win.z1 - cz) * scale;
+    const x2 = (win.x2 - cx) * scale;
+    const z2 = (win.z2 - cz) * scale;
+    const len = Math.hypot(x2 - x1, z2 - z1);
+    if (len < 0.01) return;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight * 0.34, wallThickness * 1.5), glassMat);
+    frame.position.set((x1 + x2) * 0.5, wallHeight * 0.56, (z1 + z2) * 0.5);
+    frame.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+    group.add(frame);
+  });
+
+  const addBox = (x, z, w, d, h, yaw, mat, y = h * scale * 0.5 + 0.022) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.018, w * scale), Math.max(0.018, h * scale), Math.max(0.018, d * scale)), mat);
+    mesh.position.set((x - cx) * scale, y, (z - cz) * scale);
+    mesh.rotation.y = yaw;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+
+  (floor.furniture || []).forEach((item) => {
+    const n = String(item.name || '').toLowerCase();
+    if (n.includes('stair')) return;
+    if (n.includes('table') || n.includes('desk') || n.includes('rack')) {
+      addBox(item.x, item.z, item.width, item.depth, 0.74, item.angle, deskMat);
+      return;
+    }
+    if (n.includes('chair') || n.includes('seat') || n.includes('bench')) {
+      addBox(item.x, item.z, Math.min(item.width, 0.7), Math.min(item.depth, 0.7), 0.48, item.angle, chairMat);
+      return;
+    }
+    if (n.includes('laptop') || n.includes('pc') || n.includes('monitor')) {
+      addBox(item.x, item.z, 0.42, 0.08, 0.28, item.angle, pcMat, 0.11);
+      return;
+    }
+    if (n.includes('toilet') || n.includes('wc') || n.includes('washbasin')) {
+      addBox(item.x, item.z, Math.min(item.width, 0.7), Math.min(item.depth, 0.7), 0.55, item.angle, fixtureMat);
+    }
   });
 
   const label = createARTextSprite(`${FLOOR_LABELS[floorIdx]} - 2m AR Model`);
@@ -461,6 +538,7 @@ function showFloorPreview(message) {
 }
 
 async function startFloorAR() {
+  closeARFloorDialog();
   if (arState.session) {
     await arState.session.end();
     return;
@@ -2427,7 +2505,25 @@ async function loadWorld() {
         const dx = Math.cos(angle) * w * 0.5;
         const dz = Math.sin(angle) * w * 0.5;
         return { x1: x - dx, z1: z - dz, x2: x + dx, z2: z + dz };
-      })
+      }),
+      windows: (winD || []).map((win) => {
+        const x = toWorld(win.x);
+        const z = toWorld(win.y);
+        const w = toWorld(win.width || 120);
+        const angle = -toNum(win.angle, 0);
+        const dx = Math.cos(angle) * w * 0.5;
+        const dz = Math.sin(angle) * w * 0.5;
+        return { x1: x - dx, z1: z - dz, x2: x + dx, z2: z + dz, angle };
+      }),
+      furniture: (fD || []).map((f) => ({
+        name: f.name || '',
+        x: toWorld(f.x),
+        z: toWorld(f.y),
+        width: Math.max(0.3, toWorld(f.width || 100)),
+        depth: Math.max(0.3, toWorld(f.depth || 70)),
+        height: Math.max(0.35, toWorld(f.height || 75)),
+        angle: -toNum(f.angle, 0)
+      }))
     });
 
     const groundMainEntranceDoorIndex = ALL_FLOORS[i] === 'groundgloor'
@@ -3353,8 +3449,16 @@ async function init() {
     applyQualityProfile(UI.qualitySelect.value);
     UI.qualitySelect.addEventListener('change', (e) => applyQualityProfile(e.target.value));
   }
-  if (UI.arFloorBtn) UI.arFloorBtn.addEventListener('click', startFloorAR);
-  if (UI.arFloorBtnOverlay) UI.arFloorBtnOverlay.addEventListener('click', startFloorAR);
+  syncARFloorSelectionFromMain();
+  if (UI.arFloorBtn) UI.arFloorBtn.addEventListener('click', openARFloorDialog);
+  if (UI.arFloorBtnOverlay) UI.arFloorBtnOverlay.addEventListener('click', openARFloorDialog);
+  if (UI.arFloorStart) UI.arFloorStart.addEventListener('click', startFloorAR);
+  if (UI.arFloorClose) UI.arFloorClose.addEventListener('click', closeARFloorDialog);
+  if (UI.arFloorDialog) {
+    UI.arFloorDialog.addEventListener('click', (e) => {
+      if (e.target === UI.arFloorDialog) closeARFloorDialog();
+    });
+  }
   ctrl.pos.copy(world.floorSafeSpawns[4] || world.spawnPoint || new THREE.Vector3(50.0, SETTINGS.playerHeight, 0.0));
   ctrl.pos.y = 4 * SETTINGS.floorHeight + SETTINGS.playerHeight;
   if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
@@ -3384,6 +3488,7 @@ async function init() {
     if (UI.floorSelectOverlay && UI.floorSelectOverlay.selectedIndex !== e.target.selectedIndex) {
       UI.floorSelectOverlay.selectedIndex = e.target.selectedIndex;
     }
+    if (UI.arFloorSelect) UI.arFloorSelect.value = e.target.value;
     const fIdx = ALL_FLOORS.length - 1 - e.target.selectedIndex;
     const safe = world.floorSafeSpawns[fIdx];
     if (safe) ctrl.pos.copy(safe);
