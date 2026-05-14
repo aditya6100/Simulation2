@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 /**
  * COLLEGE LAB SIMULATION PRO - ARCHITECTURAL ENGINE
@@ -104,7 +105,9 @@ const arState = {
   cameraStream: null,
   cameraVideo: null,
   savedSceneBackground: null,
-  savedSceneFog: null
+  savedSceneFog: null,
+  webXRButton: null,
+  pendingFloorIdx: 4
 };
 
 // --- 2. PHYSICS & COLLISION ---
@@ -290,6 +293,46 @@ function closeARFloorDialog() {
     UI.arFloorDialog.classList.remove('active');
     UI.arFloorDialog.setAttribute('aria-hidden', 'true');
   }
+}
+
+function styleARWebXRButton(button) {
+  button.id = 'arWebXRStart';
+  button.className = 'ar-start-btn ar-webxr-btn';
+  button.style.position = 'static';
+  button.style.display = 'block';
+  button.style.width = '100%';
+  button.style.margin = '0';
+  button.style.transform = 'none';
+}
+
+function beforeARWebXRStart() {
+  arState.pendingFloorIdx = getSelectedFloorIndex();
+  prepareARFloorModelForSession(arState.pendingFloorIdx);
+  if (document.pointerLockElement) document.exitPointerLock();
+  arState.wasControllerEnabled = !!ctrl?.enabled;
+  if (ctrl) {
+    ctrl.enabled = false;
+    ctrl.resetInput();
+  }
+  updateARStatus(`Starting camera AR for ${FLOOR_LABELS[arState.pendingFloorIdx]}...`);
+}
+
+function prepareARFloorModelForSession(floorIdx = getSelectedFloorIndex()) {
+  if (arState.group) {
+    scene.remove(arState.group);
+    disposeObjectTree(arState.group);
+    arState.group = null;
+  }
+  const group = createARFloorModel(floorIdx);
+  if (!group) {
+    updateARStatus('Selected floor data is not ready yet.');
+    return null;
+  }
+  group.position.set(0, -0.45, -1.5);
+  group.rotation.y = 0;
+  arState.group = group;
+  scene.add(group);
+  return group;
 }
 
 function createARTextSprite(text) {
@@ -613,69 +656,20 @@ async function startFloorAR() {
     await arState.session.end();
     return;
   }
-  if (!navigator.xr || !renderer?.xr) {
-    await showFloorPreview('Camera AR fallback is open. WebXR tracking is not available in this browser.', { useCamera: true });
-    setStatus('Camera AR fallback opened', 2.5);
-    return;
-  }
-
-  const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
-  if (!supported) {
-    await showFloorPreview('Camera AR fallback is open. Immersive WebXR AR is not supported here.', { useCamera: true });
-    setStatus('Camera AR fallback opened', 2.5);
-    return;
-  }
-
-  const floorIdx = getSelectedFloorIndex();
-  const group = createARFloorModel(floorIdx);
-  if (!group) {
-    updateARStatus('Selected floor data is not ready yet.');
-    return;
-  }
-
+  arState.pendingFloorIdx = getSelectedFloorIndex();
+  if (!prepareARFloorModelForSession(arState.pendingFloorIdx)) return;
   if (document.pointerLockElement) document.exitPointerLock();
   arState.wasControllerEnabled = !!ctrl?.enabled;
   if (ctrl) {
     ctrl.enabled = false;
     ctrl.resetInput();
   }
-
-  arState.group = group;
-  scene.add(group);
-  setSceneForAR(true);
-  updateARStatus(`Opening ${FLOOR_LABELS[floorIdx]} as a 2m AR model...`);
-
-  try {
-    const session = await navigator.xr.requestSession('immersive-ar', {
-      optionalFeatures: ['local-floor', 'dom-overlay'],
-      domOverlay: { root: document.body }
-    });
-    arState.session = session;
-    renderer.xr.enabled = true;
-    renderer.xr.setReferenceSpaceType('local');
-    await renderer.xr.setSession(session);
-    session.addEventListener('end', () => {
-      setSceneForAR(false);
-      if (arState.group) {
-        scene.remove(arState.group);
-        disposeObjectTree(arState.group);
-      }
-      arState.session = null;
-      arState.group = null;
-      if (ctrl) ctrl.enabled = arState.wasControllerEnabled && !!document.pointerLockElement;
-      updateARStatus('2m floor model');
-    });
-    updateARStatus(`${FLOOR_LABELS[floorIdx]} is showing in AR.`);
-  } catch (err) {
-    setSceneForAR(false);
-    scene.remove(group);
-    disposeObjectTree(group);
-    arState.group = null;
-    arState.session = null;
-    await showFloorPreview('Camera AR fallback is open because the WebXR session could not start.', { useCamera: true });
-    setStatus('Camera AR fallback opened', 2.5);
-    console.warn('AR session error:', err);
+  updateARStatus(`Starting camera AR for ${FLOOR_LABELS[arState.pendingFloorIdx]}...`);
+  if (arState.webXRButton && !arState.webXRButton.disabled) {
+    arState.webXRButton.click();
+    return;
   }
+  await showFloorPreview('AR is not available from this browser button. Open on the same browser/device where AR Navigation works.', { useCamera: true });
 }
 
 function setupFlashlight() {
@@ -3495,6 +3489,38 @@ async function init() {
   renderer.shadowMap.enabled = !SETTINGS.performanceMode;
   if (!SETTINGS.performanceMode) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
+  arState.webXRButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
+  styleARWebXRButton(arState.webXRButton);
+  arState.webXRButton.addEventListener('pointerdown', beforeARWebXRStart, { capture: true });
+  arState.webXRButton.addEventListener('touchstart', beforeARWebXRStart, { capture: true });
+  arState.webXRButton.addEventListener('click', beforeARWebXRStart, { capture: true });
+  if (UI.arFloorStart) {
+    UI.arFloorStart.insertAdjacentElement('afterend', arState.webXRButton);
+    UI.arFloorStart.style.display = 'none';
+  } else {
+    document.body.appendChild(arState.webXRButton);
+  }
+  renderer.xr.addEventListener('sessionstart', () => {
+    arState.session = renderer.xr.getSession();
+    closeARFloorDialog();
+    setSceneForAR(true);
+    if (arState.group) {
+      arState.group.position.set(0, -0.45, -1.5);
+      arState.group.rotation.y = 0;
+    }
+    updateARStatus(`${FLOOR_LABELS[arState.pendingFloorIdx]} is showing in camera AR.`);
+  });
+  renderer.xr.addEventListener('sessionend', () => {
+    setSceneForAR(false);
+    if (arState.group) {
+      scene.remove(arState.group);
+      disposeObjectTree(arState.group);
+    }
+    arState.session = null;
+    arState.group = null;
+    if (ctrl) ctrl.enabled = arState.wasControllerEnabled && !!document.pointerLockElement;
+    updateARStatus('Select floor and start AR');
+  });
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
   scene.add(camera);
   setupFlashlight();
