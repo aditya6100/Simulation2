@@ -480,32 +480,32 @@ function createARFloorModel(floorIdx) {
     }
   });
 
+  const placedARLabels = [];
   (floor.roomLabels || []).forEach((room, index) => {
     const labelText = String(room.name || '').trim();
     if (!labelText) return;
     const lx = (room.x - cx) * scale;
     const lz = (room.z - cz) * scale;
+    if (placedARLabels.some((p) => Math.hypot(p.x - lx, p.z - lz) < 0.105)) return;
+    placedARLabels.push({ x: lx, z: lz });
     const label = createARTextSprite(labelText, {
-      bg: 'rgba(15, 118, 110, 0.92)',
-      border: 'rgba(255,255,255,0.42)',
-      font: labelText.length > 18 ? '700 32px Arial, sans-serif' : '700 38px Arial, sans-serif',
-      width: Math.min(0.74, Math.max(0.42, labelText.length * 0.026)),
-      height: 0.13
+      bg: 'rgba(15, 118, 110, 0.78)',
+      border: 'rgba(255,255,255,0.26)',
+      font: labelText.length > 18 ? '700 25px Arial, sans-serif' : '700 29px Arial, sans-serif',
+      width: Math.min(0.46, Math.max(0.24, labelText.length * 0.016)),
+      height: 0.075
     });
-    label.position.set(lx, wallHeight + 0.16 + (index % 3) * 0.018, lz);
+    label.position.set(lx, wallHeight + 0.095 + (index % 2) * 0.01, lz);
     label.renderOrder = 20;
     group.add(label);
-
-    const pin = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.008, 0.008, wallHeight + 0.12, 8),
-      new THREE.MeshBasicMaterial({ color: 0x0f766e, transparent: true, opacity: 0.7 })
-    );
-    pin.position.set(lx, (wallHeight + 0.12) * 0.5, lz);
-    group.add(pin);
   });
 
-  const label = createARTextSprite(`${FLOOR_LABELS[floorIdx]} - 2m AR Model`);
-  label.position.set(0, 0.32, -mapD * scale * 0.5 - 0.18);
+  const label = createARTextSprite(`${FLOOR_LABELS[floorIdx]} - 2m AR Model`, {
+    width: 0.58,
+    height: 0.12,
+    font: '700 32px Arial, sans-serif'
+  });
+  label.position.set(0, wallHeight + 0.18, -mapD * scale * 0.5 - 0.12);
   group.add(label);
 
   group.position.set(0, 0.02, -1.65);
