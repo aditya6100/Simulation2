@@ -335,16 +335,21 @@ function prepareARFloorModelForSession(floorIdx = getSelectedFloorIndex()) {
   return group;
 }
 
-function createARTextSprite(text) {
+function createARTextSprite(text, options = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+  const bg = options.bg || 'rgba(15, 23, 42, 0.86)';
+  const fg = options.fg || '#ffffff';
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 42px Arial, sans-serif';
+  ctx.strokeStyle = options.border || 'rgba(255,255,255,0.28)';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+  ctx.fillStyle = fg;
+  ctx.font = options.font || '700 42px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -353,7 +358,9 @@ function createARTextSprite(text) {
   texture.anisotropy = 4;
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(0.82, 0.20, 1);
+  const width = options.width || 0.82;
+  const height = options.height || 0.20;
+  sprite.scale.set(width, height, 1);
   return sprite;
 }
 
@@ -471,6 +478,30 @@ function createARFloorModel(floorIdx) {
     if (n.includes('toilet') || n.includes('wc') || n.includes('washbasin')) {
       addBox(item.x, item.z, Math.min(item.width, 0.7), Math.min(item.depth, 0.7), 0.55, item.angle, fixtureMat);
     }
+  });
+
+  (floor.roomLabels || []).forEach((room, index) => {
+    const labelText = String(room.name || '').trim();
+    if (!labelText) return;
+    const lx = (room.x - cx) * scale;
+    const lz = (room.z - cz) * scale;
+    const label = createARTextSprite(labelText, {
+      bg: 'rgba(15, 118, 110, 0.92)',
+      border: 'rgba(255,255,255,0.42)',
+      font: labelText.length > 18 ? '700 32px Arial, sans-serif' : '700 38px Arial, sans-serif',
+      width: Math.min(0.74, Math.max(0.42, labelText.length * 0.026)),
+      height: 0.13
+    });
+    label.position.set(lx, wallHeight + 0.16 + (index % 3) * 0.018, lz);
+    label.renderOrder = 20;
+    group.add(label);
+
+    const pin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.008, wallHeight + 0.12, 8),
+      new THREE.MeshBasicMaterial({ color: 0x0f766e, transparent: true, opacity: 0.7 })
+    );
+    pin.position.set(lx, (wallHeight + 0.12) * 0.5, lz);
+    group.add(pin);
   });
 
   const label = createARTextSprite(`${FLOOR_LABELS[floorIdx]} - 2m AR Model`);
@@ -2588,7 +2619,25 @@ async function loadWorld() {
         depth: Math.max(0.3, toWorld(f.depth || 70)),
         height: Math.max(0.35, toWorld(f.height || 75)),
         angle: -toNum(f.angle, 0)
-      }))
+      })),
+      roomLabels: dD
+        .map((d, dIndex) => {
+          const name = floorNameplates.get(dIndex);
+          if (!name) return null;
+          const x = toWorld(d.x);
+          const z = toWorld(d.y);
+          const angle = -toNum(d.angle, 0);
+          const corridorCenter = new THREE.Vector2(48.5, 7.5);
+          const toCorridor = new THREE.Vector2(corridorCenter.x - x, corridorCenter.y - z);
+          const normal = new THREE.Vector2(Math.sin(angle), Math.cos(angle));
+          if (normal.dot(toCorridor) > 0) normal.multiplyScalar(-1);
+          return {
+            name,
+            x: x + normal.x * 1.05,
+            z: z + normal.y * 1.05
+          };
+        })
+        .filter(Boolean)
     });
 
     const groundMainEntranceDoorIndex = ALL_FLOORS[i] === 'groundgloor'
