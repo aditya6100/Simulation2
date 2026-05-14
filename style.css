@@ -553,6 +553,16 @@ canvas{
   line-height: 1.45;
 }
 
+.ar-camera-video{
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+  background: #000;
+}
+
 .ar-preview-panel{
   position: fixed;
   left: 50%;

@@ -100,7 +100,11 @@ const arState = {
   group: null,
   hiddenObjects: [],
   wasControllerEnabled: false,
-  preview: null
+  preview: null,
+  cameraStream: null,
+  cameraVideo: null,
+  savedSceneBackground: null,
+  savedSceneFog: null
 };
 
 // --- 2. PHYSICS & COLLISION ---
@@ -463,11 +467,66 @@ function setSceneForAR(enabled) {
   arState.hiddenObjects = [];
 }
 
+async function startCameraBackground() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Camera API is not available in this browser.');
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    },
+    audio: false
+  });
+
+  const video = document.createElement('video');
+  video.className = 'ar-camera-video';
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.srcObject = stream;
+  document.body.insertBefore(video, renderer.domElement);
+  await video.play().catch(() => {});
+
+  arState.cameraStream = stream;
+  arState.cameraVideo = video;
+  arState.savedSceneBackground = scene.background;
+  arState.savedSceneFog = scene.fog;
+  scene.background = null;
+  scene.fog = null;
+  renderer.setClearColor(0x000000, 0);
+  renderer.domElement.style.position = 'fixed';
+  renderer.domElement.style.inset = '0';
+  renderer.domElement.style.zIndex = '1';
+  renderer.domElement.style.pointerEvents = 'none';
+}
+
+function stopCameraBackground() {
+  if (arState.cameraStream) {
+    arState.cameraStream.getTracks().forEach((track) => track.stop());
+  }
+  if (arState.cameraVideo) arState.cameraVideo.remove();
+  arState.cameraStream = null;
+  arState.cameraVideo = null;
+  if (arState.savedSceneBackground !== null) scene.background = arState.savedSceneBackground;
+  if (arState.savedSceneFog !== null) scene.fog = arState.savedSceneFog;
+  arState.savedSceneBackground = null;
+  arState.savedSceneFog = null;
+  renderer.setClearColor(scene.background || 0x000000, 1);
+  renderer.domElement.style.position = '';
+  renderer.domElement.style.inset = '';
+  renderer.domElement.style.zIndex = '';
+  renderer.domElement.style.pointerEvents = '';
+}
+
 function closeFloorPreview() {
   const preview = arState.preview;
   if (!preview) return;
 
   setSceneForAR(false);
+  stopCameraBackground();
   scene.remove(preview.group);
   disposeObjectTree(preview.group);
   camera.position.copy(preview.cameraPosition);
@@ -482,7 +541,7 @@ function closeFloorPreview() {
   updateARStatus('2m floor model');
 }
 
-function showFloorPreview(message) {
+async function showFloorPreview(message, options = {}) {
   closeFloorPreview();
 
   const floorIdx = getSelectedFloorIndex();
@@ -498,12 +557,23 @@ function showFloorPreview(message) {
   arState.group = group;
   setSceneForAR(true);
 
+  let cameraMessage = message;
+  if (options.useCamera) {
+    try {
+      await startCameraBackground();
+      cameraMessage = message || 'Camera view is open. Move your phone to view the 2m floor model.';
+    } catch (err) {
+      cameraMessage = 'Camera permission failed. Showing the 2m floor preview instead.';
+      console.warn('Camera fallback error:', err);
+    }
+  }
+
   const panel = document.createElement('div');
   panel.className = 'ar-preview-panel';
   panel.innerHTML = `
     <div>
       <strong>${FLOOR_LABELS[floorIdx]} AR floor model</strong>
-      <span>${message || 'Showing 2m preview. Use a supported WebXR phone browser for camera AR.'}</span>
+      <span>${cameraMessage || 'Showing 2m preview. Use a supported WebXR phone browser for tracked AR.'}</span>
     </div>
     <button type="button" aria-label="Close AR floor preview">Close</button>
   `;
@@ -531,10 +601,10 @@ function showFloorPreview(message) {
   }, 0);
 
   camera.fov = 52;
-  camera.position.set(0, 1.35, 2.65);
+  camera.position.set(0, 1.25, 2.45);
   camera.lookAt(0, 0.04, 0);
   camera.updateProjectionMatrix();
-  updateARStatus(message || `${FLOOR_LABELS[floorIdx]} is showing as a 2m preview.`);
+  updateARStatus(cameraMessage || `${FLOOR_LABELS[floorIdx]} is showing as a 2m preview.`);
 }
 
 async function startFloorAR() {
@@ -544,15 +614,15 @@ async function startFloorAR() {
     return;
   }
   if (!navigator.xr || !renderer?.xr) {
-    showFloorPreview('WebXR AR is not available here, so this is the 2m floor preview.');
-    setStatus('AR is not available in this browser', 2.5);
+    await showFloorPreview('Camera AR fallback is open. WebXR tracking is not available in this browser.', { useCamera: true });
+    setStatus('Camera AR fallback opened', 2.5);
     return;
   }
 
   const supported = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
   if (!supported) {
-    showFloorPreview('Immersive AR is not supported here, so this is the 2m floor preview.');
-    setStatus('Immersive AR not supported', 2.5);
+    await showFloorPreview('Camera AR fallback is open. Immersive WebXR AR is not supported here.', { useCamera: true });
+    setStatus('Camera AR fallback opened', 2.5);
     return;
   }
 
@@ -582,6 +652,7 @@ async function startFloorAR() {
     });
     arState.session = session;
     renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local');
     await renderer.xr.setSession(session);
     session.addEventListener('end', () => {
       setSceneForAR(false);
@@ -601,8 +672,8 @@ async function startFloorAR() {
     disposeObjectTree(group);
     arState.group = null;
     arState.session = null;
-    showFloorPreview('AR session could not start, so this is the 2m floor preview.');
-    setStatus('AR session could not start', 2.5);
+    await showFloorPreview('Camera AR fallback is open because the WebXR session could not start.', { useCamera: true });
+    setStatus('Camera AR fallback opened', 2.5);
     console.warn('AR session error:', err);
   }
 }
@@ -3417,7 +3488,7 @@ function setupMobileControls(ctrl) {
 }
 
 async function init() {
-  renderer = new THREE.WebGLRenderer({ antialias: !SETTINGS.performanceMode, powerPreference: "high-performance" });
+  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: !SETTINGS.performanceMode, powerPreference: "high-performance" });
   renderer.xr.enabled = true;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, SETTINGS.performanceMode ? 0.75 : 1.35));
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -3495,7 +3566,7 @@ async function init() {
     ctrl.pos.y = Math.max(0, fIdx) * SETTINGS.floorHeight + SETTINGS.playerHeight;
     ctrl.resetInput();
     if (arState.session) updateARStatus(`${FLOOR_LABELS[fIdx]} selected. Restart AR to refresh model.`);
-    if (arState.preview) showFloorPreview(`${FLOOR_LABELS[fIdx]} is showing as a 2m preview.`);
+    if (arState.preview) showFloorPreview(`${FLOOR_LABELS[fIdx]} is showing as a 2m preview.`, { useCamera: !!arState.cameraStream });
   });
   if (UI.floorSelectOverlay) {
     UI.floorSelectOverlay.addEventListener('change', (e) => {
