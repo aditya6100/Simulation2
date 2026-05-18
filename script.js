@@ -4340,7 +4340,8 @@ function getMobileLayoutSettings() {
       move: { x: 13, y: 70 },
       actions: { x: 88, y: 66 },
       settings: { x: 88, y: 45 },
-      quickbar: { x: 50, y: 8 }
+      quickbar: { x: 50, y: 8 },
+      editor: { x: 76, y: 20 }
     }
   };
   try {
@@ -4374,6 +4375,15 @@ function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
     el.style.bottom = 'auto';
     el.style.transform = 'translate(-50%, -50%)';
   });
+  if (UI.mobileSettingsPanel) {
+    const pos = settings.positions?.editor;
+    if (pos) {
+      UI.mobileSettingsPanel.style.left = `${pos.x}%`;
+      UI.mobileSettingsPanel.style.top = `${pos.y}%`;
+      UI.mobileSettingsPanel.style.right = 'auto';
+      UI.mobileSettingsPanel.style.transform = 'translate(-50%, -50%)';
+    }
+  }
   try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
   requestAnimationFrame(() => {
     keepMobileLayoutInViewport();
@@ -4409,6 +4419,23 @@ function keepMobileLayoutInViewport() {
     el.style.bottom = 'auto';
     el.style.transform = 'translate(-50%, -50%)';
   });
+
+  if (UI.mobileSettingsPanel && settings.positions?.editor) {
+    const rect = UI.mobileSettingsPanel.getBoundingClientRect();
+    const pos = settings.positions.editor;
+    const halfW = Math.min(42, Math.max(8, (rect.width / width) * 50));
+    const halfH = Math.min(42, Math.max(8, (rect.height / height) * 50));
+    const x = THREE.MathUtils.clamp(Number(pos.x) || 76, halfW, 100 - halfW);
+    const y = THREE.MathUtils.clamp(Number(pos.y) || 20, halfH, 100 - halfH);
+    if (x !== pos.x || y !== pos.y) {
+      settings.positions.editor = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      changed = true;
+    }
+    UI.mobileSettingsPanel.style.left = `${settings.positions.editor.x}%`;
+    UI.mobileSettingsPanel.style.top = `${settings.positions.editor.y}%`;
+    UI.mobileSettingsPanel.style.right = 'auto';
+    UI.mobileSettingsPanel.style.transform = 'translate(-50%, -50%)';
+  }
 
   if (changed) {
     try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
@@ -4456,6 +4483,48 @@ function setupMobileLayoutSettings() {
         closeEditor();
       }
     });
+  }
+
+  if (UI.mobileSettingsPanel) {
+    const handle = UI.mobileSettingsPanel.querySelector('.mobile-settings-head') || UI.mobileSettingsPanel;
+    let editorPointerId = null;
+    let editorOffsetX = 0;
+    let editorOffsetY = 0;
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('button')) return;
+      const rect = UI.mobileSettingsPanel.getBoundingClientRect();
+      editorPointerId = event.pointerId;
+      editorOffsetX = event.clientX - rect.left;
+      editorOffsetY = event.clientY - rect.top;
+      handle.setPointerCapture?.(editorPointerId);
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    handle.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== editorPointerId) return;
+      const vv = window.visualViewport;
+      const width = Math.max(1, vv?.width || window.innerWidth);
+      const height = Math.max(1, vv?.height || window.innerHeight);
+      const rect = UI.mobileSettingsPanel.getBoundingClientRect();
+      const centerX = event.clientX - editorOffsetX + rect.width / 2;
+      const centerY = event.clientY - editorOffsetY + rect.height / 2;
+      const x = THREE.MathUtils.clamp((centerX / width) * 100, 8, 92);
+      const y = THREE.MathUtils.clamp((centerY / height) * 100, 8, 92);
+      UI.mobileSettingsPanel.style.left = `${x}%`;
+      UI.mobileSettingsPanel.style.top = `${y}%`;
+      UI.mobileSettingsPanel.style.right = 'auto';
+      UI.mobileSettingsPanel.style.transform = 'translate(-50%, -50%)';
+      const settings = getMobileLayoutSettings();
+      settings.positions.editor = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    const endEditorDrag = (event) => {
+      if (event.pointerId === editorPointerId) editorPointerId = null;
+    };
+    handle.addEventListener('pointerup', endEditorDrag);
+    handle.addEventListener('pointercancel', endEditorDrag);
   }
 
   MOBILE_DRAG_ITEMS.forEach(({ key, selector }) => {

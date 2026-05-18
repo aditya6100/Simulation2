@@ -968,13 +968,14 @@ body[data-control-size="large"] .touch-action-btn{
 
 #mobileSettingsPanel{
   position: fixed;
-  right: 10px;
-  top: 10px;
+  left: 76%;
+  top: 20%;
   z-index: 32;
   display: none;
   width: min(230px, calc(var(--app-vw, 100vw) - 20px));
   pointer-events: none;
   box-sizing: border-box;
+  transform: translate(-50%, -50%);
 }
 
 #mobileSettingsPanel.active{
@@ -1005,6 +1006,8 @@ body[data-control-size="large"] .touch-action-btn{
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 8px;
+  cursor: grab;
+  touch-action: none;
 }
 
 .mobile-settings-head strong{
