@@ -37,6 +37,8 @@
         top: 20px;
         left: 20px;
         width: 300px;
+        max-height: calc(100vh - 40px);
+        overflow: auto;
         background: rgba(12, 16, 22, 0.8);
         border: 1px solid rgba(255,255,255,0.2);
         border-radius: 10px;
@@ -78,7 +80,6 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
-        margin-bottom: 10px;
       }
       .pick-btn {
         min-height: 34px;
@@ -143,7 +144,27 @@
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 8px;
-        margin-top: 12px;
+      }
+      .nav-section {
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px;
+        background: rgba(255,255,255,0.05);
+        margin-bottom: 10px;
+      }
+      .nav-section summary {
+        min-height: 34px;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        color: #00ffcc;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      .nav-section-body {
+        padding: 0 8px 8px;
       }
       .route-summary div {
         border: 1px solid rgba(255,255,255,0.12);
@@ -165,11 +186,8 @@
         font-size: 13px;
       }
       .nudge-panel {
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 6px;
         padding: 8px;
-        margin-bottom: 10px;
-        background: rgba(255,255,255,0.05);
+        background: transparent;
       }
       .nudge-panel span {
         display: block;
@@ -204,6 +222,49 @@
         margin-top: 6px;
         color: #00ffcc;
       }
+      #accuracy-warning {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, 0.62);
+        box-sizing: border-box;
+      }
+      #accuracy-warning.active { display: flex; }
+      .accuracy-card {
+        width: min(420px, calc(100vw - 34px));
+        border: 1px solid rgba(0,255,204,0.32);
+        border-radius: 10px;
+        background: rgba(12, 16, 22, 0.96);
+        box-shadow: 0 28px 70px rgba(0,0,0,0.42);
+        padding: 18px;
+        color: #fff;
+      }
+      .accuracy-card strong {
+        display: block;
+        color: #00ffcc;
+        font-size: 18px;
+        margin-bottom: 8px;
+      }
+      .accuracy-card p {
+        margin: 0 0 12px;
+        color: rgba(255,255,255,0.78);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .accuracy-card button {
+        width: 100%;
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: #00ffcc;
+        color: #000;
+        font-weight: 850;
+        cursor: pointer;
+      }
       @media (max-width: 760px) {
         #nav-ui {
           left: 10px;
@@ -224,6 +285,14 @@
     </style>
   </head>
   <body>
+    <div id="accuracy-warning" role="dialog" aria-modal="true" aria-labelledby="accuracy-title">
+      <div class="accuracy-card">
+        <strong id="accuracy-title">AR Position Accuracy Notice</strong>
+        <p>Indoor AR position can drift because phone sensors and camera tracking are not exact. Use the current-location picker, nudge controls, and Snap to Corridor before following the route.</p>
+        <button id="accuracy-ok" type="button">I Understand</button>
+      </div>
+    </div>
+
     <div id="nav-ui">
       <a href="index.html" class="back-btn">&larr; Back to Simulation</a>
       <div class="panel-title">Navigation System</div>
@@ -254,34 +323,43 @@
         </select>
       </div>
 
-      <div class="pick-row">
-        <button id="pick-start-btn" class="pick-btn active" type="button">Pick Current</button>
-        <button id="pick-dest-btn" class="pick-btn" type="button">Pick Destination</button>
-      </div>
-
-      <div class="nudge-panel" aria-label="Current position correction">
-        <span>Adjust Current Position</span>
-        <div class="nudge-grid">
-          <button id="nudge-forward" type="button">Forward</button>
-          <button id="nudge-left" type="button">Left</button>
-          <button id="nudge-right" type="button">Right</button>
-          <button id="nudge-back" type="button">Back</button>
+      <details class="nav-section">
+        <summary>Pick & Correct Position</summary>
+        <div class="nav-section-body">
+          <div class="pick-row">
+            <button id="pick-start-btn" class="pick-btn active" type="button">Pick Current</button>
+            <button id="pick-dest-btn" class="pick-btn" type="button">Pick Destination</button>
+          </div>
+          <div class="nudge-panel" aria-label="Current position correction">
+            <span>Adjust Current Position</span>
+            <div class="nudge-grid">
+              <button id="nudge-forward" type="button">Forward</button>
+              <button id="nudge-left" type="button">Left</button>
+              <button id="nudge-right" type="button">Right</button>
+              <button id="nudge-back" type="button">Back</button>
+            </div>
+            <button id="snap-corridor-btn" class="snap-btn" type="button">Snap to Corridor</button>
+          </div>
         </div>
-        <button id="snap-corridor-btn" class="snap-btn" type="button">Snap to Corridor</button>
-      </div>
+      </details>
 
       <button id="go-btn">Start Navigation</button>
       <div id="status-msg">Select start and end points on the map.</div>
-      <div class="route-summary" aria-label="Route summary">
-        <div><span>Distance</span><strong id="route-distance">--</strong></div>
-        <div><span>ETA</span><strong id="route-eta">--</strong></div>
-        <div><span>Turns</span><strong id="route-turns">--</strong></div>
-      </div>
-      <div class="legend" aria-label="Map legend">
-        <span class="start">Current</span>
-        <span class="dest">Destination</span>
-        <span class="route">Route</span>
-      </div>
+      <details class="nav-section">
+        <summary>Route Details</summary>
+        <div class="nav-section-body">
+          <div class="route-summary" aria-label="Route summary">
+            <div><span>Distance</span><strong id="route-distance">--</strong></div>
+            <div><span>ETA</span><strong id="route-eta">--</strong></div>
+            <div><span>Turns</span><strong id="route-turns">--</strong></div>
+          </div>
+          <div class="legend" aria-label="Map legend">
+            <span class="start">Current</span>
+            <span class="dest">Destination</span>
+            <span class="route">Route</span>
+          </div>
+        </div>
+      </details>
     </div>
 
     <div id="minimap-container">

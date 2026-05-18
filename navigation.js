@@ -28,6 +28,8 @@ const UI = {
   nudgeLeft: document.getElementById('nudge-left'),
   nudgeRight: document.getElementById('nudge-right'),
   snapCorridorBtn: document.getElementById('snap-corridor-btn'),
+  accuracyWarning: document.getElementById('accuracy-warning'),
+  accuracyOk: document.getElementById('accuracy-ok'),
   routeDistance: document.getElementById('route-distance'),
   routeEta: document.getElementById('route-eta'),
   routeTurns: document.getElementById('route-turns')
@@ -43,10 +45,23 @@ let path = [];
 let occupancyGrid = null;
 let gridBounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0, width: 0, height: 0 };
 let pickMode = 'start';
+const ACCURACY_WARNING_KEY = 'campus_ar_nav_accuracy_warning_seen_v1';
 
 // --- 1. UTILS ---
 async function loadJson(url) { try { const r = await fetch(url, { cache: 'no-store' }); return r.ok ? await r.json() : []; } catch(e) { return []; } }
 const toWorld = (v) => parseFloat(v) * SETTINGS.unitScale || 0;
+
+function showAccuracyWarning() {
+  if (!UI.accuracyWarning || !UI.accuracyOk) return;
+  let seen = false;
+  try { seen = localStorage.getItem(ACCURACY_WARNING_KEY) === '1'; } catch {}
+  if (seen) return;
+  UI.accuracyWarning.classList.add('active');
+  UI.accuracyOk.addEventListener('click', () => {
+    UI.accuracyWarning.classList.remove('active');
+    try { localStorage.setItem(ACCURACY_WARNING_KEY, '1'); } catch {}
+  }, { once: true });
+}
 
 // --- 2. DATA LOADING ---
 async function loadFloorData(floor) {
@@ -758,6 +773,7 @@ function visualizePath3D() {
 }
 
 async function initNavigation() {
+  showAccuracyWarning();
   roomLabels = await loadJson('./room-labels.json');
   init3D();
   await loadFloorData('4thfloor');
