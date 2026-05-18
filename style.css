@@ -274,6 +274,39 @@ canvas{
   display: block;
 }
 
+#landscapePrompt{
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: none;
+  place-items: center;
+  padding: 22px;
+  background: rgba(15, 23, 42, 0.86);
+  color: #f8fafc;
+  text-align: center;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+#landscapePrompt.active{
+  display: grid;
+}
+
+#landscapePrompt strong,
+#landscapePrompt span{
+  display: block;
+}
+
+#landscapePrompt strong{
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+#landscapePrompt span{
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
 .panel-link-row{
   margin-top: 10px;
   border-top: 1px solid rgba(15, 23, 42, 0.10);
@@ -783,38 +816,45 @@ canvas{
   display: block;
 }
 
-.touch-zone{
+.wasd-pad{
   position: absolute;
-  bottom: 20px;
-  width: 138px;
-  height: 138px;
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(10, 14, 20, 0.34);
+  left: 18px;
+  bottom: 18px;
+  width: 156px;
+  height: 116px;
+  display: grid;
+  grid-template-columns: repeat(3, 48px);
+  grid-template-rows: repeat(2, 48px);
+  gap: 8px;
   pointer-events: auto;
   touch-action: none;
-  backdrop-filter: blur(4px);
 }
 
-#movePad{
-  left: 18px;
+.wasd-btn{
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.24);
+  background: rgba(15, 23, 42, 0.58);
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 16px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+  backdrop-filter: blur(5px);
+  touch-action: none;
 }
 
-#lookPad{
+.wasd-btn.active{
+  background: rgba(20, 184, 166, 0.72);
+  border-color: rgba(94, 234, 212, 0.88);
+}
+
+.wasd-w{ grid-column: 2; grid-row: 1; }
+.wasd-a{ grid-column: 1; grid-row: 2; }
+.wasd-s{ grid-column: 2; grid-row: 2; }
+.wasd-d{ grid-column: 3; grid-row: 2; }
+
+body[data-move-position="right"] .wasd-pad{
+  left: auto;
   right: 18px;
-}
-
-.touch-stick{
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.22);
-  border: 1px solid rgba(255,255,255,0.25);
-  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
 }
 
 .touch-action-btn{
@@ -830,6 +870,102 @@ canvas{
   font-weight: 800;
   pointer-events: auto;
   touch-action: manipulation;
+}
+
+.settings-touch-btn{
+  bottom: 244px;
+  width: 58px;
+  border-radius: 16px;
+  font-size: 12px;
+}
+
+body[data-action-position="left"] .touch-action-btn{
+  right: auto;
+  left: 30px;
+}
+
+body[data-action-position="left"] .settings-touch-btn{
+  right: auto;
+  left: 30px;
+}
+
+body[data-action-position="left"][data-move-position="left"] .touch-action-btn,
+body[data-action-position="left"][data-move-position="left"] .settings-touch-btn{
+  left: 196px;
+}
+
+body[data-action-position="right"][data-move-position="right"] .touch-action-btn,
+body[data-action-position="right"][data-move-position="right"] .settings-touch-btn{
+  right: 196px;
+}
+
+#mobileSettingsPanel{
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.42);
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+#mobileSettingsPanel.active{
+  display: flex;
+}
+
+.mobile-settings-card{
+  width: min(340px, calc(100vw - 30px));
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255,255,255,0.96);
+  padding: 16px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.26);
+  box-sizing: border-box;
+}
+
+.mobile-settings-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mobile-settings-head strong{
+  font-size: 18px;
+}
+
+.mobile-settings-head button{
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(241,245,249,0.95);
+  cursor: pointer;
+}
+
+.mobile-settings-card label{
+  display: block;
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobile-settings-card select{
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px 10px;
+  color: #0f172a;
+  font: inherit;
 }
 
 @media (max-width: 760px) {
@@ -855,7 +991,45 @@ canvas{
   #panel-right-top{ right: 8px; top: 8px; }
   #panel-left-bottom{ left: 8px; bottom: 170px; }
   #mission-hud{
+    display: block;
+    left: 50%;
+    top: 8px;
+    width: min(430px, calc(100vw - 24px));
+    min-width: 0;
+    transform: translateX(-50%);
+    padding: 8px;
+  }
+
+  body[data-hud-position="bottom"] #mission-hud{
+    top: auto;
+    bottom: 8px;
+  }
+
+  body[data-hud-position="hidden"] #mission-hud{
     display: none;
+  }
+
+  #mission-hud .panel-title{
+    display: none;
+  }
+
+  .hud-grid{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .hud-grid div{
+    min-height: 42px;
+    padding: 6px;
+  }
+
+  .hud-grid span{
+    font-size: 8px;
+    margin-bottom: 3px;
+  }
+
+  .hud-grid strong{
+    font-size: 10px;
   }
 
   #minimap-container{
@@ -958,7 +1132,42 @@ canvas{
   }
 
   #mission-hud{
+    display: block;
+    left: 50%;
+    top: 8px;
+    bottom: auto;
+    width: min(360px, 46vw);
+    min-width: 0;
+    transform: translateX(-50%);
+    padding: 6px;
+  }
+
+  body[data-hud-position="bottom"] #mission-hud{
+    top: auto;
+    bottom: 8px;
+  }
+
+  body[data-hud-position="hidden"] #mission-hud{
     display: none;
+  }
+
+  .hud-grid{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .hud-grid div{
+    min-height: 34px;
+    padding: 4px;
+  }
+
+  .hud-grid span{
+    font-size: 7px;
+    margin-bottom: 2px;
+  }
+
+  .hud-grid strong{
+    font-size: 9px;
   }
 
   #minimap-container{
@@ -999,30 +1208,48 @@ canvas{
     padding: 4px 6px !important;
   }
 
-  .touch-zone{
+  .wasd-pad{
+    left: 14px;
     bottom: 12px;
-    width: 112px;
-    height: 112px;
+    width: 132px;
+    height: 98px;
+    grid-template-columns: repeat(3, 40px);
+    grid-template-rows: repeat(2, 40px);
+    gap: 6px;
   }
 
-  #movePad{
-    left: 16px;
-  }
-
-  #lookPad{
-    right: 16px;
-  }
-
-  .touch-stick{
-    width: 44px;
-    height: 44px;
+  body[data-move-position="right"] .wasd-pad{
+    left: auto;
+    right: 14px;
   }
 
   .touch-action-btn{
-    right: 142px;
-    bottom: 38px;
+    right: 14px;
+    bottom: 24px;
     width: 50px;
     height: 50px;
+  }
+
+  .settings-touch-btn{
+    bottom: 84px;
+    width: 50px;
+    font-size: 10px;
+  }
+
+  body[data-action-position="left"] .touch-action-btn,
+  body[data-action-position="left"] .settings-touch-btn{
+    left: 14px;
+    right: auto;
+  }
+
+  body[data-action-position="left"][data-move-position="left"] .touch-action-btn,
+  body[data-action-position="left"][data-move-position="left"] .settings-touch-btn{
+    left: 154px;
+  }
+
+  body[data-action-position="right"][data-move-position="right"] .touch-action-btn,
+  body[data-action-position="right"][data-move-position="right"] .settings-touch-btn{
+    right: 154px;
   }
 
   .overlay-card{

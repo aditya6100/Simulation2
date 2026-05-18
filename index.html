@@ -103,6 +103,10 @@
     </div>
 
     <div id="interactionPrompt" aria-live="polite"></div>
+    <div id="landscapePrompt" aria-live="polite">
+      <strong>Rotate for simulation</strong>
+      <span>Landscape view gives the best mobile controls.</span>
+    </div>
 
     <div id="overlay">
       <div class="overlay-card">
@@ -187,9 +191,38 @@
       </div>
     </div>
     <div id="mobileControls" aria-hidden="true">
-      <div id="movePad" class="touch-zone"><div class="touch-stick"></div></div>
-      <div id="lookPad" class="touch-zone"><div class="touch-stick"></div></div>
+      <div id="movePad" class="wasd-pad" aria-label="Movement controls">
+        <button class="wasd-btn wasd-w" type="button" data-move="KeyW">W</button>
+        <button class="wasd-btn wasd-a" type="button" data-move="KeyA">A</button>
+        <button class="wasd-btn wasd-s" type="button" data-move="KeyS">S</button>
+        <button class="wasd-btn wasd-d" type="button" data-move="KeyD">D</button>
+      </div>
+      <button id="mobileSettingsBtn" class="touch-action-btn settings-touch-btn" type="button" aria-label="Open mobile settings">SET</button>
       <button id="mobileInteract" class="touch-action-btn" type="button">E</button>
+    </div>
+    <div id="mobileSettingsPanel" aria-hidden="true">
+      <div class="mobile-settings-card" role="dialog" aria-modal="true" aria-labelledby="mobileSettingsTitle">
+        <div class="mobile-settings-head">
+          <strong id="mobileSettingsTitle">Mobile Layout</strong>
+          <button id="mobileSettingsClose" type="button" aria-label="Close mobile settings">x</button>
+        </div>
+        <label for="hudPositionSelect">HUD position</label>
+        <select id="hudPositionSelect">
+          <option value="top">Top</option>
+          <option value="bottom">Bottom</option>
+          <option value="hidden">Hidden</option>
+        </select>
+        <label for="movePositionSelect">WASD position</label>
+        <select id="movePositionSelect">
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+        <label for="actionPositionSelect">Action buttons</label>
+        <select id="actionPositionSelect">
+          <option value="right">Right</option>
+          <option value="left">Left</option>
+        </select>
+      </div>
     </div>
     <script type="module" src="./script.js?v=20260507-lab-charts-roomwall"></script>
   </body>

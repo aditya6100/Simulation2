@@ -44,13 +44,20 @@ const UI = {
   hudCoords: document.getElementById('hudCoords'),
   hudSystems: document.getElementById('hudSystems'),
   interactionPrompt: document.getElementById('interactionPrompt'),
+  landscapePrompt: document.getElementById('landscapePrompt'),
   mobileControls: document.getElementById('mobileControls'),
   movePad: document.getElementById('movePad'),
-  lookPad: document.getElementById('lookPad'),
-  mobileInteract: document.getElementById('mobileInteract')
+  mobileInteract: document.getElementById('mobileInteract'),
+  mobileSettingsBtn: document.getElementById('mobileSettingsBtn'),
+  mobileSettingsPanel: document.getElementById('mobileSettingsPanel'),
+  mobileSettingsClose: document.getElementById('mobileSettingsClose'),
+  hudPositionSelect: document.getElementById('hudPositionSelect'),
+  movePositionSelect: document.getElementById('movePositionSelect'),
+  actionPositionSelect: document.getElementById('actionPositionSelect')
 };
 
 const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+const MOBILE_LAYOUT_STORAGE_KEY = 'campusMobileLayoutV1';
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
@@ -4185,71 +4192,134 @@ class FPSController {
 }
 
 function setupMobileControls(ctrl) {
-  if (!IS_TOUCH_DEVICE || !UI.mobileControls || !UI.movePad || !UI.lookPad) return;
+  if (!IS_TOUCH_DEVICE || !UI.mobileControls || !UI.movePad) return;
 
-  const bindStick = (pad, onMove, onEnd) => {
-    const stick = pad.querySelector('.touch-stick');
-    let activeId = null;
-    const radius = 52;
-
-    const update = (clientX, clientY) => {
-      const rect = pad.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = Math.max(-radius, Math.min(radius, clientX - cx));
-      const dy = Math.max(-radius, Math.min(radius, clientY - cy));
-      if (stick) stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      onMove(dx / radius, dy / radius);
-    };
-
-    pad.addEventListener('pointerdown', (e) => {
-      activeId = e.pointerId;
-      pad.setPointerCapture(activeId);
-      update(e.clientX, e.clientY);
-      e.preventDefault();
-    });
-    pad.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== activeId) return;
-      update(e.clientX, e.clientY);
-      e.preventDefault();
-    });
-    const end = (e) => {
-      if (e.pointerId !== activeId) return;
-      activeId = null;
-      if (stick) stick.style.transform = 'translate(-50%, -50%)';
-      onEnd();
-      e.preventDefault();
-    };
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
+  const setMoveKey = (code, active) => {
+    ctrl.keys[code] = active;
+    const button = UI.movePad.querySelector(`[data-move="${code}"]`);
+    if (button) button.classList.toggle('active', active);
   };
 
-  bindStick(
-    UI.movePad,
-    (x, y) => {
-      ctrl.touchMove.x = x;
-      ctrl.touchMove.y = -y;
-    },
-    () => {
-      ctrl.touchMove.x = 0;
-      ctrl.touchMove.y = 0;
-    }
-  );
+  UI.movePad.querySelectorAll('[data-move]').forEach((button) => {
+    const code = button.dataset.move;
+    const start = (event) => {
+      setMoveKey(code, true);
+      button.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    };
+    const end = (event) => {
+      setMoveKey(code, false);
+      event.preventDefault();
+    };
+    button.addEventListener('pointerdown', start);
+    button.addEventListener('pointerup', end);
+    button.addEventListener('pointercancel', end);
+    button.addEventListener('lostpointercapture', () => setMoveKey(code, false));
+  });
 
-  bindStick(
-    UI.lookPad,
-    (x, y) => {
-      ctrl.yaw -= x * SETTINGS.mouseSensitivity * 9;
-      ctrl.pitch = Math.max(-1.5, Math.min(1.5, ctrl.pitch - y * SETTINGS.mouseSensitivity * 9));
-    },
-    () => {}
-  );
+  let lookPointerId = null;
+  let lookLastX = 0;
+  let lookLastY = 0;
+  const isControlTarget = (target) => !!target.closest?.('#mobileControls, #mobileSettingsPanel, #liftDashboard, #arFloorDialog, #overlay');
+  renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (!ctrl.mobileActive || isControlTarget(event.target)) return;
+    lookPointerId = event.pointerId;
+    lookLastX = event.clientX;
+    lookLastY = event.clientY;
+    renderer.domElement.setPointerCapture?.(lookPointerId);
+    event.preventDefault();
+  });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    if (!ctrl.mobileActive || event.pointerId !== lookPointerId) return;
+    const dx = event.clientX - lookLastX;
+    const dy = event.clientY - lookLastY;
+    lookLastX = event.clientX;
+    lookLastY = event.clientY;
+    ctrl.yaw -= dx * SETTINGS.mouseSensitivity * 1.25;
+    ctrl.pitch = Math.max(-1.5, Math.min(1.5, ctrl.pitch - dy * SETTINGS.mouseSensitivity * 1.25));
+    event.preventDefault();
+  });
+  const endLook = (event) => {
+    if (event.pointerId === lookPointerId) lookPointerId = null;
+  };
+  renderer.domElement.addEventListener('pointerup', endLook);
+  renderer.domElement.addEventListener('pointercancel', endLook);
 
   if (UI.mobileInteract) {
     UI.mobileInteract.addEventListener('click', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
     });
   }
+}
+
+function getMobileLayoutSettings() {
+  const defaults = { hud: 'top', move: 'left', actions: 'right' };
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem(MOBILE_LAYOUT_STORAGE_KEY) || '{}') };
+  } catch {
+    return defaults;
+  }
+}
+
+function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
+  document.body.dataset.hudPosition = settings.hud;
+  document.body.dataset.movePosition = settings.move;
+  document.body.dataset.actionPosition = settings.actions;
+  if (UI.hudPositionSelect) UI.hudPositionSelect.value = settings.hud;
+  if (UI.movePositionSelect) UI.movePositionSelect.value = settings.move;
+  if (UI.actionPositionSelect) UI.actionPositionSelect.value = settings.actions;
+  try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
+}
+
+function setupMobileLayoutSettings() {
+  applyMobileLayoutSettings();
+  const update = () => applyMobileLayoutSettings({
+    hud: UI.hudPositionSelect?.value || 'top',
+    move: UI.movePositionSelect?.value || 'left',
+    actions: UI.actionPositionSelect?.value || 'right'
+  });
+  [UI.hudPositionSelect, UI.movePositionSelect, UI.actionPositionSelect].forEach((select) => {
+    if (select) select.addEventListener('change', update);
+  });
+  if (UI.mobileSettingsBtn) {
+    UI.mobileSettingsBtn.addEventListener('click', () => {
+      UI.mobileSettingsPanel?.classList.add('active');
+      UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'false');
+    });
+  }
+  if (UI.mobileSettingsClose) {
+    UI.mobileSettingsClose.addEventListener('click', () => {
+      UI.mobileSettingsPanel?.classList.remove('active');
+      UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'true');
+    });
+  }
+  if (UI.mobileSettingsPanel) {
+    UI.mobileSettingsPanel.addEventListener('click', (event) => {
+      if (event.target === UI.mobileSettingsPanel) {
+        UI.mobileSettingsPanel.classList.remove('active');
+        UI.mobileSettingsPanel.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }
+}
+
+function updateLandscapePrompt() {
+  if (!UI.landscapePrompt) return;
+  const shouldShow = IS_TOUCH_DEVICE && ctrl?.mobileActive && window.innerHeight > window.innerWidth;
+  UI.landscapePrompt.classList.toggle('active', shouldShow);
+}
+
+async function requestLandscapeMode() {
+  if (!IS_TOUCH_DEVICE) return;
+  try {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {}
+  try {
+    if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+  } catch {}
+  updateLandscapePrompt();
 }
 
 async function init() {
@@ -4308,6 +4378,7 @@ async function init() {
   scene.add(sun);
   ctrl = new FPSController(camera); ctrl.attach(); 
   setupMobileControls(ctrl);
+  setupMobileLayoutSettings();
   ROOM_LABELS = await loadJson('./room-labels.json');
   const world = await loadWorld();
   minimapWorld = world;
@@ -4330,16 +4401,18 @@ async function init() {
   ctrl.pos.copy(world.floorSafeSpawns[4] || world.spawnPoint || new THREE.Vector3(50.0, SETTINGS.playerHeight, 0.0));
   ctrl.pos.y = 4 * SETTINGS.floorHeight + SETTINGS.playerHeight;
   if (UI.floorSelectOverlay) UI.floorSelectOverlay.selectedIndex = UI.floorSelect.selectedIndex;
-  const startExperience = () => {
+  const startExperience = async () => {
     if (UI.floorSelectOverlay && UI.floorSelectOverlay.selectedIndex !== UI.floorSelect.selectedIndex) {
       UI.floorSelect.selectedIndex = UI.floorSelectOverlay.selectedIndex;
       UI.floorSelect.dispatchEvent(new Event('change'));
     }
     if (IS_TOUCH_DEVICE || !document.body.requestPointerLock) {
+      await requestLandscapeMode();
       ctrl.enabled = true;
       ctrl.mobileActive = true;
       UI.overlay.style.display = 'none';
       if (UI.mobileControls) UI.mobileControls.classList.add('active');
+      updateLandscapePrompt();
       return;
     }
     document.body.requestPointerLock();
@@ -4430,7 +4503,11 @@ async function init() {
       activateEmergencyLockdown(world);
     }
   });
-  window.addEventListener('resize', () => drawSimulationMinimap());
+  window.addEventListener('resize', () => {
+    drawSimulationMinimap();
+    updateLandscapePrompt();
+  });
+  window.addEventListener('orientationchange', () => setTimeout(updateLandscapePrompt, 250));
   function animate() {
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;
