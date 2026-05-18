@@ -125,6 +125,7 @@ let liftTravelInProgress = false;
 let audioContext = null;
 let statusOverrideUntil = 0;
 const AR_FLOOR_SIZE_METERS = 2.0;
+const DOOR_AUTO_CLOSE_SECONDS = 3.6;
 const arState = {
   session: null,
   group: null,
@@ -528,8 +529,13 @@ function createARFloorModel(floorIdx) {
   const addFurnitureGroup = (item) => {
     const n = String(item.name || '').toLowerCase();
     if (n.includes('stair') || n.includes('railing') || n.includes('door') || n.includes('window')) return null;
-    const w = THREE.MathUtils.clamp(item.width || 0.65, 0.22, 2.4);
-    const d = THREE.MathUtils.clamp(item.depth || 0.55, 0.18, 1.8);
+    const isTableLike = n.includes('table') || n.includes('desk') || n.includes('rack');
+    const w = isTableLike
+      ? THREE.MathUtils.clamp(item.width || 0.65, 0.22, 4.5)
+      : THREE.MathUtils.clamp(item.width || 0.65, 0.22, 2.4);
+    const d = isTableLike
+      ? THREE.MathUtils.clamp(item.depth || 0.55, 0.18, 7.0)
+      : THREE.MathUtils.clamp(item.depth || 0.55, 0.18, 1.8);
     const h = THREE.MathUtils.clamp(item.height || 0.75, 0.16, 2.1);
     const yaw = item.angle || 0;
     const fg = new THREE.Group();
@@ -553,7 +559,7 @@ function createARFloorModel(floorIdx) {
       addFurniturePart(fg, 0, 0.72, -d * 0.34, w, 0.48, 0.08, chairMat);
       addFurniturePart(fg, -w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
       addFurniturePart(fg, w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
-    } else if (n.includes('table') || n.includes('desk') || n.includes('rack')) {
+    } else if (isTableLike) {
       addFurniturePart(fg, 0, 0.76, 0, w, 0.08, d, deskTopMat);
       addFurniturePart(fg, 0, 0.48, -d * 0.42, w * 0.85, 0.34, 0.045, deskMat);
       const legW = 0.055;
@@ -562,9 +568,10 @@ function createARFloorModel(floorIdx) {
       addFurniturePart(fg, -w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
       addFurniturePart(fg, w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
     } else if (n.includes('laptop')) {
-      addFurniturePart(fg, 0, 0.05, 0.06, Math.min(w, 0.46), 0.035, Math.min(d, 0.30), pcMat);
-      const screen = addFurniturePart(fg, 0, 0.20, -0.08, Math.min(w, 0.44), 0.28, 0.028, screenMat);
-      screen.rotation.x = -0.18;
+      addFurniturePart(fg, 0, 0.77, 0.12, 0.42, 0.025, 0.18, pcMat);
+      addFurniturePart(fg, 0.25, 0.77, 0.12, 0.055, 0.018, 0.10, pcMat);
+      const screen = addFurniturePart(fg, 0, 0.94, -0.055, 0.46, 0.28, 0.025, screenMat);
+      screen.rotation.x = -0.22;
     } else if (n.includes('pc') || n.includes('monitor')) {
       addFurniturePart(fg, 0, 0.20, 0, 0.42, 0.28, 0.035, screenMat);
       addFurniturePart(fg, 0, 0.06, 0.05, 0.08, 0.12, 0.06, pcMat);
@@ -1764,7 +1771,7 @@ function addLabChartsForFloor(floorKey, elev, walls = []) {
   placements.forEach((placement, idx) => {
     const chart = charts[(idx + (placement.right ? 1 : 0)) % charts.length];
     const seed = new THREE.Vector3(placement.x, elev + 1.72, placement.z);
-    const mount = snapWallMountToWall(seed, placement.yaw, walls, { maxDistance: 0.45 });
+    const mount = snapWallMountToWall(seed, placement.yaw, walls, { maxDistance: 1.15 });
     addWallChart(chart[0], chart[1], mount.position, mount.yaw, {
       accent: chart[2],
       width: 1.00,
@@ -4074,6 +4081,7 @@ async function loadWorld() {
         type:'door',
         isOpen:false,
         targetRot:0,
+        autoCloseAt:0,
         locked:false,
         lockedMessage:'',
         colW,
@@ -4087,6 +4095,7 @@ async function loadWorld() {
           }
           this.isOpen=!this.isOpen;
           this.targetRot=this.isOpen?Math.PI*0.6:0;
+          this.autoCloseAt=this.isOpen ? clock.elapsedTime + DOOR_AUTO_CLOSE_SECONDS : 0;
           this.colW.active=!this.isOpen;
           if (this.clearance) this.clearance.active = this.isOpen;
           this.sideBlockers.forEach((b) => { b.active = true; });
@@ -4941,7 +4950,17 @@ async function init() {
 
     if(ctrl.enabled && !renderer.xr.isPresenting) ctrl.update(dt, GLOBAL_COLLISION);
 
-    world.doorList.forEach(d => { d.pivot.rotation.y += (d.targetRot - d.pivot.rotation.y) * dt * 8; });
+    world.doorList.forEach(d => {
+      if (d.isOpen && d.autoCloseAt && t >= d.autoCloseAt) {
+        d.isOpen = false;
+        d.targetRot = 0;
+        d.autoCloseAt = 0;
+        d.colW.active = true;
+        if (d.clearance) d.clearance.active = false;
+        setStatus('Door closed');
+      }
+      d.pivot.rotation.y += (d.targetRot - d.pivot.rotation.y) * dt * 8;
+    });
 
     (world.autoDoors || []).forEach(ad => {
       if (ad.kind !== 'slidingEntrance') return;
