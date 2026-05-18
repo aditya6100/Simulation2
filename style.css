@@ -828,6 +828,7 @@ canvas{
   gap: 8px;
   pointer-events: auto;
   touch-action: none;
+  transform: translate(-50%, -50%);
 }
 
 .wasd-btn{
@@ -842,6 +843,37 @@ canvas{
   touch-action: none;
 }
 
+body[data-control-size="compact"] .wasd-pad{
+  width: 132px;
+  height: 98px;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(2, 40px);
+  gap: 6px;
+}
+
+body[data-control-size="large"] .wasd-pad{
+  width: 186px;
+  height: 138px;
+  grid-template-columns: repeat(3, 58px);
+  grid-template-rows: repeat(2, 58px);
+  gap: 10px;
+}
+
+body[data-control-shape="circle"] .wasd-btn,
+body[data-control-shape="circle"] .touch-action-btn{
+  border-radius: 50%;
+}
+
+body[data-control-shape="square"] .wasd-btn,
+body[data-control-shape="square"] .touch-action-btn{
+  border-radius: 4px;
+}
+
+body[data-control-shape="pill"] .wasd-btn,
+body[data-control-shape="pill"] .touch-action-btn{
+  border-radius: 999px;
+}
+
 .wasd-btn.active{
   background: rgba(20, 184, 166, 0.72);
   border-color: rgba(94, 234, 212, 0.88);
@@ -851,11 +883,6 @@ canvas{
 .wasd-a{ grid-column: 1; grid-row: 2; }
 .wasd-s{ grid-column: 2; grid-row: 2; }
 .wasd-d{ grid-column: 3; grid-row: 2; }
-
-body[data-move-position="right"] .wasd-pad{
-  left: auto;
-  right: 18px;
-}
 
 .touch-action-btn{
   position: absolute;
@@ -870,6 +897,17 @@ body[data-move-position="right"] .wasd-pad{
   font-weight: 800;
   pointer-events: auto;
   touch-action: manipulation;
+  transform: translate(-50%, -50%);
+}
+
+body[data-control-size="compact"] .touch-action-btn{
+  width: 48px;
+  height: 48px;
+}
+
+body[data-control-size="large"] .touch-action-btn{
+  width: 68px;
+  height: 68px;
 }
 
 .settings-touch-btn{
@@ -877,26 +915,6 @@ body[data-move-position="right"] .wasd-pad{
   width: 58px;
   border-radius: 16px;
   font-size: 12px;
-}
-
-body[data-action-position="left"] .touch-action-btn{
-  right: auto;
-  left: 30px;
-}
-
-body[data-action-position="left"] .settings-touch-btn{
-  right: auto;
-  left: 30px;
-}
-
-body[data-action-position="left"][data-move-position="left"] .touch-action-btn,
-body[data-action-position="left"][data-move-position="left"] .settings-touch-btn{
-  left: 196px;
-}
-
-body[data-action-position="right"][data-move-position="right"] .touch-action-btn,
-body[data-action-position="right"][data-move-position="right"] .settings-touch-btn{
-  right: 196px;
 }
 
 #mobileSettingsPanel{
@@ -924,6 +942,13 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
   padding: 16px;
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.26);
   box-sizing: border-box;
+}
+
+.mobile-settings-card p{
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .mobile-settings-head{
@@ -968,6 +993,51 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
   font: inherit;
 }
 
+.layout-reset-btn{
+  width: 100%;
+  min-height: 42px;
+  margin-top: 14px;
+  border: 1px solid rgba(15,118,110,0.36);
+  border-radius: 6px;
+  background: rgba(20,184,166,0.12);
+  color: var(--accent);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+body.layout-editing #mission-hud,
+body.layout-editing #minimap-container,
+body.layout-editing #panel-left-bottom,
+body.layout-editing #movePad,
+body.layout-editing #mobileInteract,
+body.layout-editing #mobileSettingsBtn{
+  outline: 2px dashed rgba(20, 184, 166, 0.95);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 9999px transparent;
+  cursor: grab;
+}
+
+body.layout-editing #mission-hud::before,
+body.layout-editing #minimap-container::before,
+body.layout-editing #panel-left-bottom::before,
+body.layout-editing #movePad::before,
+body.layout-editing #mobileInteract::before,
+body.layout-editing #mobileSettingsBtn::before{
+  content: "Drag";
+  position: absolute;
+  left: 50%;
+  top: -24px;
+  transform: translateX(-50%);
+  z-index: 3;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #f8fafc;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 850;
+  pointer-events: none;
+}
+
 @media (max-width: 760px) {
   #overlay{
     padding: 14px;
@@ -999,23 +1069,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     text-align: center;
   }
 
-  body[data-zone-position="top-left"] #panel-left-bottom{
-    left: 8px;
-    top: 72px;
-    bottom: auto;
-    transform: none;
-  }
-
-  body[data-zone-position="bottom-left"] #panel-left-bottom{
-    left: 8px;
-    top: auto;
-    bottom: 8px;
-    transform: none;
-  }
-
-  body[data-zone-position="hidden"] #panel-left-bottom{
-    display: none;
-  }
   #mission-hud{
     display: block;
     left: 50%;
@@ -1024,15 +1077,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     min-width: 0;
     transform: translateX(-50%);
     padding: 8px;
-  }
-
-  body[data-hud-position="bottom"] #mission-hud{
-    top: auto;
-    bottom: 8px;
-  }
-
-  body[data-hud-position="hidden"] #mission-hud{
-    display: none;
   }
 
   #mission-hud .panel-title{
@@ -1065,23 +1109,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     height: min(42vw, 190px);
   }
 
-  body[data-minimap-position="top-right"] #minimap-container{
-    top: 82px;
-    right: 8px;
-    bottom: auto;
-    left: auto;
-  }
-
-  body[data-minimap-position="bottom-left"] #minimap-container{
-    left: 8px;
-    right: auto;
-    bottom: 8px;
-    top: auto;
-  }
-
-  body[data-minimap-position="hidden"] #minimap-container{
-    display: none;
-  }
 
   .minimap-header{
     min-height: 30px;
@@ -1176,23 +1203,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     text-align: center;
   }
 
-  body[data-zone-position="top-left"] #panel-left-bottom{
-    left: 8px;
-    top: 58px;
-    bottom: auto;
-    transform: none;
-  }
-
-  body[data-zone-position="bottom-left"] #panel-left-bottom{
-    left: 8px;
-    bottom: 8px;
-    top: auto;
-    transform: none;
-  }
-
-  body[data-zone-position="hidden"] #panel-left-bottom{
-    display: none;
-  }
 
   #mission-hud{
     display: block;
@@ -1203,15 +1213,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     min-width: 0;
     transform: translateX(-50%);
     padding: 6px;
-  }
-
-  body[data-hud-position="bottom"] #mission-hud{
-    top: auto;
-    bottom: 8px;
-  }
-
-  body[data-hud-position="hidden"] #mission-hud{
-    display: none;
   }
 
   .hud-grid{
@@ -1240,23 +1241,6 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     height: 138px;
   }
 
-  body[data-minimap-position="top-right"] #minimap-container{
-    top: 8px;
-    right: 8px;
-    bottom: auto;
-    left: auto;
-  }
-
-  body[data-minimap-position="bottom-left"] #minimap-container{
-    left: 8px;
-    right: auto;
-    bottom: 8px;
-    top: auto;
-  }
-
-  body[data-minimap-position="hidden"] #minimap-container{
-    display: none;
-  }
 
   .minimap-header{
     display: none;
@@ -1299,38 +1283,14 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     gap: 6px;
   }
 
-  body[data-move-position="right"] .wasd-pad{
-    left: auto;
-    right: 14px;
-  }
-
   .touch-action-btn{
-    right: 14px;
-    bottom: 24px;
     width: 50px;
     height: 50px;
   }
 
   .settings-touch-btn{
-    bottom: 84px;
     width: 50px;
     font-size: 10px;
-  }
-
-  body[data-action-position="left"] .touch-action-btn,
-  body[data-action-position="left"] .settings-touch-btn{
-    left: 14px;
-    right: auto;
-  }
-
-  body[data-action-position="left"][data-move-position="left"] .touch-action-btn,
-  body[data-action-position="left"][data-move-position="left"] .settings-touch-btn{
-    left: 154px;
-  }
-
-  body[data-action-position="right"][data-move-position="right"] .touch-action-btn,
-  body[data-action-position="right"][data-move-position="right"] .settings-touch-btn{
-    right: 154px;
   }
 
   .overlay-card{

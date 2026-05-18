@@ -51,15 +51,21 @@ const UI = {
   mobileSettingsBtn: document.getElementById('mobileSettingsBtn'),
   mobileSettingsPanel: document.getElementById('mobileSettingsPanel'),
   mobileSettingsClose: document.getElementById('mobileSettingsClose'),
-  hudPositionSelect: document.getElementById('hudPositionSelect'),
-  minimapPositionSelect: document.getElementById('minimapPositionSelect'),
-  zonePositionSelect: document.getElementById('zonePositionSelect'),
-  movePositionSelect: document.getElementById('movePositionSelect'),
-  actionPositionSelect: document.getElementById('actionPositionSelect')
+  controlShapeSelect: document.getElementById('controlShapeSelect'),
+  controlSizeSelect: document.getElementById('controlSizeSelect'),
+  mobileLayoutReset: document.getElementById('mobileLayoutReset')
 };
 
 const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 const MOBILE_LAYOUT_STORAGE_KEY = 'campusMobileLayoutV1';
+const MOBILE_DRAG_ITEMS = [
+  { key: 'hud', selector: '#mission-hud' },
+  { key: 'minimap', selector: '#minimap-container' },
+  { key: 'zone', selector: '#panel-left-bottom' },
+  { key: 'move', selector: '#movePad' },
+  { key: 'actions', selector: '#mobileInteract' },
+  { key: 'settings', selector: '#mobileSettingsBtn' }
+];
 
 const ALL_FLOORS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 const FLOOR_LABELS = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor', '5th Floor'];
@@ -4265,61 +4271,130 @@ function setupMobileControls(ctrl) {
 }
 
 function getMobileLayoutSettings() {
-  const defaults = { hud: 'top', minimap: 'bottom-right', zone: 'bottom-center', move: 'left', actions: 'right' };
+  const defaults = {
+    shape: 'rounded',
+    size: 'normal',
+    positions: {
+      hud: { x: 50, y: 8 },
+      minimap: { x: 82, y: 62 },
+      zone: { x: 50, y: 86 },
+      move: { x: 13, y: 70 },
+      actions: { x: 88, y: 66 },
+      settings: { x: 88, y: 45 }
+    }
+  };
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(MOBILE_LAYOUT_STORAGE_KEY) || '{}') };
+    const saved = JSON.parse(localStorage.getItem(MOBILE_LAYOUT_STORAGE_KEY) || '{}');
+    return {
+      ...defaults,
+      ...saved,
+      positions: { ...defaults.positions, ...(saved.positions || {}) }
+    };
   } catch {
     return defaults;
   }
 }
 
 function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
-  document.body.dataset.hudPosition = settings.hud;
-  document.body.dataset.minimapPosition = settings.minimap;
-  document.body.dataset.zonePosition = settings.zone;
-  document.body.dataset.movePosition = settings.move;
-  document.body.dataset.actionPosition = settings.actions;
-  if (UI.hudPositionSelect) UI.hudPositionSelect.value = settings.hud;
-  if (UI.minimapPositionSelect) UI.minimapPositionSelect.value = settings.minimap;
-  if (UI.zonePositionSelect) UI.zonePositionSelect.value = settings.zone;
-  if (UI.movePositionSelect) UI.movePositionSelect.value = settings.move;
-  if (UI.actionPositionSelect) UI.actionPositionSelect.value = settings.actions;
+  document.body.dataset.controlShape = settings.shape;
+  document.body.dataset.controlSize = settings.size;
+  const shape = ['rounded', 'circle', 'square', 'pill'].includes(settings.shape) ? settings.shape : 'rounded';
+  const size = ['normal', 'compact', 'large'].includes(settings.size) ? settings.size : 'normal';
+  document.body.dataset.controlShape = shape;
+  document.body.dataset.controlSize = size;
+  if (UI.controlShapeSelect) UI.controlShapeSelect.value = shape;
+  if (UI.controlSizeSelect) UI.controlSizeSelect.value = size;
+  MOBILE_DRAG_ITEMS.forEach(({ key, selector }) => {
+    const el = document.querySelector(selector);
+    const pos = settings.positions?.[key];
+    if (!el || !pos) return;
+    el.style.left = `${pos.x}%`;
+    el.style.top = `${pos.y}%`;
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.transform = 'translate(-50%, -50%)';
+  });
   try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
   requestAnimationFrame(() => drawSimulationMinimap());
 }
 
 function setupMobileLayoutSettings() {
   applyMobileLayoutSettings();
-  const update = () => applyMobileLayoutSettings({
-    hud: UI.hudPositionSelect?.value || 'top',
-    minimap: UI.minimapPositionSelect?.value || 'bottom-right',
-    zone: UI.zonePositionSelect?.value || 'bottom-center',
-    move: UI.movePositionSelect?.value || 'left',
-    actions: UI.actionPositionSelect?.value || 'right'
-  });
-  [UI.hudPositionSelect, UI.minimapPositionSelect, UI.zonePositionSelect, UI.movePositionSelect, UI.actionPositionSelect].forEach((select) => {
-    if (select) select.addEventListener('change', update);
+  const updateShape = () => {
+    const settings = getMobileLayoutSettings();
+    settings.shape = UI.controlShapeSelect?.value || 'rounded';
+    settings.size = UI.controlSizeSelect?.value || 'normal';
+    applyMobileLayoutSettings(settings);
+  };
+  [UI.controlShapeSelect, UI.controlSizeSelect].forEach((select) => {
+    if (select) select.addEventListener('change', updateShape);
   });
   if (UI.mobileSettingsBtn) {
     UI.mobileSettingsBtn.addEventListener('click', () => {
+      document.body.classList.add('layout-editing');
       UI.mobileSettingsPanel?.classList.add('active');
       UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'false');
     });
   }
   if (UI.mobileSettingsClose) {
     UI.mobileSettingsClose.addEventListener('click', () => {
+      document.body.classList.remove('layout-editing');
       UI.mobileSettingsPanel?.classList.remove('active');
       UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'true');
+    });
+  }
+  if (UI.mobileLayoutReset) {
+    UI.mobileLayoutReset.addEventListener('click', () => {
+      try { localStorage.removeItem(MOBILE_LAYOUT_STORAGE_KEY); } catch {}
+      applyMobileLayoutSettings();
     });
   }
   if (UI.mobileSettingsPanel) {
     UI.mobileSettingsPanel.addEventListener('click', (event) => {
       if (event.target === UI.mobileSettingsPanel) {
+        document.body.classList.remove('layout-editing');
         UI.mobileSettingsPanel.classList.remove('active');
         UI.mobileSettingsPanel.setAttribute('aria-hidden', 'true');
       }
     });
   }
+
+  MOBILE_DRAG_ITEMS.forEach(({ key, selector }) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    let activeId = null;
+    const moveTo = (event) => {
+      const x = THREE.MathUtils.clamp((event.clientX / Math.max(1, window.innerWidth)) * 100, 5, 95);
+      const y = THREE.MathUtils.clamp((event.clientY / Math.max(1, window.innerHeight)) * 100, 5, 95);
+      el.style.left = `${x}%`;
+      el.style.top = `${y}%`;
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+      el.style.transform = 'translate(-50%, -50%)';
+      const settings = getMobileLayoutSettings();
+      settings.positions[key] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      applyMobileLayoutSettings(settings);
+    };
+    el.addEventListener('pointerdown', (event) => {
+      if (!document.body.classList.contains('layout-editing')) return;
+      activeId = event.pointerId;
+      el.setPointerCapture?.(activeId);
+      moveTo(event);
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    el.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== activeId) return;
+      moveTo(event);
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    const end = (event) => {
+      if (event.pointerId === activeId) activeId = null;
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  });
 }
 
 function updateLandscapePrompt() {
