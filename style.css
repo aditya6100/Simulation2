@@ -592,7 +592,9 @@ body > canvas{
 }
 
 .ar-floor-card{
-  width: min(390px, calc(100vw - 32px));
+  width: min(430px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 36px));
+  overflow: auto;
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 8px;
   background: rgba(248, 250, 252, 0.96);
@@ -651,11 +653,32 @@ body > canvas{
   margin-bottom: 14px;
 }
 
+.ar-options-section{
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.58);
+  margin-bottom: 10px;
+}
+
+.ar-options-section summary{
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .ar-options-grid{
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 12px;
+  padding: 0 10px 10px;
+  margin-bottom: 0;
 }
 
 .ar-options-grid label{
@@ -679,7 +702,8 @@ body > canvas{
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 12px;
+  padding: 0 10px 10px;
+  margin-bottom: 0;
 }
 
 .ar-placement-controls button{
