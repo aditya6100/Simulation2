@@ -52,6 +52,8 @@ const UI = {
   mobileSettingsPanel: document.getElementById('mobileSettingsPanel'),
   mobileSettingsClose: document.getElementById('mobileSettingsClose'),
   hudPositionSelect: document.getElementById('hudPositionSelect'),
+  minimapPositionSelect: document.getElementById('minimapPositionSelect'),
+  zonePositionSelect: document.getElementById('zonePositionSelect'),
   movePositionSelect: document.getElementById('movePositionSelect'),
   actionPositionSelect: document.getElementById('actionPositionSelect')
 };
@@ -273,6 +275,16 @@ function drawSimulationMinimap() {
   ctx.fillStyle = '#0f172a';
   ctx.font = `${11 * dpr}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillText(FLOOR_LABELS[floorIdx], 10 * dpr, 17 * dpr);
+}
+
+function resizeSimulationViewport() {
+  if (!renderer || !camera) return;
+  const width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+  const height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+  renderer.setSize(width, height, false);
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  drawSimulationMinimap();
 }
 
 function getSelectedFloorIndex() {
@@ -4253,7 +4265,7 @@ function setupMobileControls(ctrl) {
 }
 
 function getMobileLayoutSettings() {
-  const defaults = { hud: 'top', move: 'left', actions: 'right' };
+  const defaults = { hud: 'top', minimap: 'bottom-right', zone: 'bottom-center', move: 'left', actions: 'right' };
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(MOBILE_LAYOUT_STORAGE_KEY) || '{}') };
   } catch {
@@ -4263,22 +4275,29 @@ function getMobileLayoutSettings() {
 
 function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
   document.body.dataset.hudPosition = settings.hud;
+  document.body.dataset.minimapPosition = settings.minimap;
+  document.body.dataset.zonePosition = settings.zone;
   document.body.dataset.movePosition = settings.move;
   document.body.dataset.actionPosition = settings.actions;
   if (UI.hudPositionSelect) UI.hudPositionSelect.value = settings.hud;
+  if (UI.minimapPositionSelect) UI.minimapPositionSelect.value = settings.minimap;
+  if (UI.zonePositionSelect) UI.zonePositionSelect.value = settings.zone;
   if (UI.movePositionSelect) UI.movePositionSelect.value = settings.move;
   if (UI.actionPositionSelect) UI.actionPositionSelect.value = settings.actions;
   try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
+  requestAnimationFrame(() => drawSimulationMinimap());
 }
 
 function setupMobileLayoutSettings() {
   applyMobileLayoutSettings();
   const update = () => applyMobileLayoutSettings({
     hud: UI.hudPositionSelect?.value || 'top',
+    minimap: UI.minimapPositionSelect?.value || 'bottom-right',
+    zone: UI.zonePositionSelect?.value || 'bottom-center',
     move: UI.movePositionSelect?.value || 'left',
     actions: UI.actionPositionSelect?.value || 'right'
   });
-  [UI.hudPositionSelect, UI.movePositionSelect, UI.actionPositionSelect].forEach((select) => {
+  [UI.hudPositionSelect, UI.minimapPositionSelect, UI.zonePositionSelect, UI.movePositionSelect, UI.actionPositionSelect].forEach((select) => {
     if (select) select.addEventListener('change', update);
   });
   if (UI.mobileSettingsBtn) {
@@ -4319,6 +4338,9 @@ async function requestLandscapeMode() {
   try {
     if (screen.orientation?.lock) await screen.orientation.lock('landscape');
   } catch {}
+  setTimeout(resizeSimulationViewport, 120);
+  setTimeout(resizeSimulationViewport, 450);
+  setTimeout(resizeSimulationViewport, 900);
   updateLandscapePrompt();
 }
 
@@ -4412,6 +4434,8 @@ async function init() {
       ctrl.mobileActive = true;
       UI.overlay.style.display = 'none';
       if (UI.mobileControls) UI.mobileControls.classList.add('active');
+      resizeSimulationViewport();
+      setTimeout(resizeSimulationViewport, 300);
       updateLandscapePrompt();
       return;
     }
@@ -4504,10 +4528,18 @@ async function init() {
     }
   });
   window.addEventListener('resize', () => {
-    drawSimulationMinimap();
+    resizeSimulationViewport();
     updateLandscapePrompt();
   });
-  window.addEventListener('orientationchange', () => setTimeout(updateLandscapePrompt, 250));
+  window.addEventListener('orientationchange', () => {
+    setTimeout(resizeSimulationViewport, 120);
+    setTimeout(resizeSimulationViewport, 450);
+    setTimeout(updateLandscapePrompt, 250);
+  });
+  document.addEventListener('fullscreenchange', () => {
+    setTimeout(resizeSimulationViewport, 120);
+    setTimeout(resizeSimulationViewport, 450);
+  });
   function animate() {
     const dt = Math.min(0.05, clock.getDelta());
     const t = clock.elapsedTime;

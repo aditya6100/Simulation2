@@ -989,7 +989,33 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
 
   #panel-left-top{ left: 8px; top: 8px; }
   #panel-right-top{ right: 8px; top: 8px; }
-  #panel-left-bottom{ left: 8px; bottom: 170px; }
+  #panel-left-bottom{
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 8px;
+    transform: translateX(-50%);
+    width: min(240px, 48vw);
+    text-align: center;
+  }
+
+  body[data-zone-position="top-left"] #panel-left-bottom{
+    left: 8px;
+    top: 72px;
+    bottom: auto;
+    transform: none;
+  }
+
+  body[data-zone-position="bottom-left"] #panel-left-bottom{
+    left: 8px;
+    top: auto;
+    bottom: 8px;
+    transform: none;
+  }
+
+  body[data-zone-position="hidden"] #panel-left-bottom{
+    display: none;
+  }
   #mission-hud{
     display: block;
     left: 50%;
@@ -1037,6 +1063,24 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     bottom: 170px;
     width: min(42vw, 190px);
     height: min(42vw, 190px);
+  }
+
+  body[data-minimap-position="top-right"] #minimap-container{
+    top: 82px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+  }
+
+  body[data-minimap-position="bottom-left"] #minimap-container{
+    left: 8px;
+    right: auto;
+    bottom: 8px;
+    top: auto;
+  }
+
+  body[data-minimap-position="hidden"] #minimap-container{
+    display: none;
   }
 
   .minimap-header{
@@ -1126,9 +1170,28 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
   #panel-left-bottom{
     left: 50%;
     bottom: 8px;
+    top: auto;
     transform: translateX(-50%);
     width: min(230px, 38vw);
     text-align: center;
+  }
+
+  body[data-zone-position="top-left"] #panel-left-bottom{
+    left: 8px;
+    top: 58px;
+    bottom: auto;
+    transform: none;
+  }
+
+  body[data-zone-position="bottom-left"] #panel-left-bottom{
+    left: 8px;
+    bottom: 8px;
+    top: auto;
+    transform: none;
+  }
+
+  body[data-zone-position="hidden"] #panel-left-bottom{
+    display: none;
   }
 
   #mission-hud{
@@ -1175,6 +1238,24 @@ body[data-action-position="right"][data-move-position="right"] .settings-touch-b
     bottom: 8px;
     width: 138px;
     height: 138px;
+  }
+
+  body[data-minimap-position="top-right"] #minimap-container{
+    top: 8px;
+    right: 8px;
+    bottom: auto;
+    left: auto;
+  }
+
+  body[data-minimap-position="bottom-left"] #minimap-container{
+    left: 8px;
+    right: auto;
+    bottom: 8px;
+    top: auto;
+  }
+
+  body[data-minimap-position="hidden"] #minimap-container{
+    display: none;
   }
 
   .minimap-header{
