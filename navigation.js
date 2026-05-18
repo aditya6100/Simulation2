@@ -23,6 +23,11 @@ const UI = {
   arBtn: document.getElementById('ar-btn'),
   pickStartBtn: document.getElementById('pick-start-btn'),
   pickDestBtn: document.getElementById('pick-dest-btn'),
+  nudgeForward: document.getElementById('nudge-forward'),
+  nudgeBack: document.getElementById('nudge-back'),
+  nudgeLeft: document.getElementById('nudge-left'),
+  nudgeRight: document.getElementById('nudge-right'),
+  snapCorridorBtn: document.getElementById('snap-corridor-btn'),
   routeDistance: document.getElementById('route-distance'),
   routeEta: document.getElementById('route-eta'),
   routeTurns: document.getElementById('route-turns')
@@ -165,6 +170,72 @@ function snapToWalkable(pos) {
   return pos;
 }
 
+function closestPointOnSegment(pos, a, b) {
+  const vx = b.x - a.x;
+  const vz = b.z - a.z;
+  const l2 = vx * vx + vz * vz;
+  if (l2 < 1e-6) return { x: a.x, z: a.z, dist: Math.hypot(pos.x - a.x, pos.z - a.z) };
+  const t = Math.max(0, Math.min(1, ((pos.x - a.x) * vx + (pos.z - a.z) * vz) / l2));
+  const x = a.x + vx * t;
+  const z = a.z + vz * t;
+  return { x, z, dist: Math.hypot(pos.x - x, pos.z - z) };
+}
+
+function getCorridorCenterlines() {
+  const minZ = gridBounds.minZ + 1.4;
+  const maxZ = gridBounds.maxZ - 1.4;
+  const minX = gridBounds.minX + 1.4;
+  const maxX = gridBounds.maxX - 1.4;
+  return [
+    { a: { x: 48.45, z: minZ }, b: { x: 48.45, z: maxZ } },
+    { a: { x: minX, z: 24.2 }, b: { x: maxX, z: 24.2 } },
+    { a: { x: minX, z: -16.0 }, b: { x: maxX, z: -16.0 } },
+    { a: { x: 48.45, z: 6.2 }, b: { x: 56.5, z: 6.2 } },
+    { a: { x: 48.45, z: -3.2 }, b: { x: 56.5, z: -3.2 } }
+  ];
+}
+
+function snapToCorridor(pos) {
+  const walkable = snapToWalkable(pos);
+  let best = null;
+  for (const segment of getCorridorCenterlines()) {
+    const projected = closestPointOnSegment(walkable, segment.a, segment.b);
+    const snapped = snapToWalkable(projected);
+    const dist = Math.hypot(walkable.x - snapped.x, walkable.z - snapped.z);
+    if (!best || dist < best.dist) best = { ...snapped, dist };
+  }
+  return best ? { x: best.x, z: best.z } : walkable;
+}
+
+function setCurrentPosition(pos, message = 'Current position adjusted.', options = {}) {
+  startPos = options.corridorSnap === false ? snapToWalkable(pos) : snapToCorridor(pos);
+  UI.startSelect.value = '';
+  if (destPos) {
+    path = getPath(startPos, snapToWalkable(destPos));
+    updateRouteSummary(path);
+    visualizePath3D();
+    if (!path.length) resetRouteSummary();
+  } else {
+    path = [];
+    resetRouteSummary();
+  }
+  renderMinimap();
+  if (isARSessionActive) anchorRouteForAR();
+  UI.statusMsg.innerText = message;
+}
+
+function nudgeCurrentPosition(dx, dz) {
+  if (!startPos) {
+    UI.statusMsg.innerText = 'Set your current position before using nudge controls.';
+    return;
+  }
+  setCurrentPosition(
+    { x: startPos.x + dx, z: startPos.z + dz },
+    'Current position nudged. Use Snap to Corridor if AR alignment drifts.',
+    { corridorSnap: false }
+  );
+}
+
 // --- 3. MINIMAP RENDERING ---
 function renderMinimap() {
   const ctx = UI.minimapCanvas.getContext('2d');
@@ -260,11 +331,7 @@ UI.minimapCanvas.addEventListener('click', (e) => {
   const point = snapToWalkable({ x, z });
   
   if (pickMode === 'start') {
-    startPos = point;
-    path = [];
-    resetRouteSummary();
-    UI.startSelect.value = '';
-    UI.statusMsg.innerText = 'Current location set. Pick your destination.';
+    setCurrentPosition(point, 'Current location set and snapped to corridor. Pick your destination.');
     setPickMode('dest');
   } else {
     destPos = point;
@@ -513,12 +580,8 @@ UI.destSelect.addEventListener('change', (e) => {
 UI.startSelect.addEventListener('change', (e) => {
   const loc = findLocation(e.target.value);
   if (!loc) return;
-  startPos = { x: loc.x, z: loc.z };
-  path = [];
-  resetRouteSummary();
+  setCurrentPosition({ x: loc.x, z: loc.z }, `Current location set: ${loc.name}.`);
   setPickMode('dest');
-  renderMinimap();
-  UI.statusMsg.innerText = `Current location set: ${loc.name}.`;
 });
 
 UI.pickStartBtn.addEventListener('click', () => {
@@ -530,6 +593,20 @@ UI.pickDestBtn.addEventListener('click', () => {
   setPickMode('dest');
   UI.statusMsg.innerText = 'Click the minimap to set where you want to go.';
 });
+
+if (UI.nudgeForward) UI.nudgeForward.addEventListener('click', () => nudgeCurrentPosition(0, -0.4));
+if (UI.nudgeBack) UI.nudgeBack.addEventListener('click', () => nudgeCurrentPosition(0, 0.4));
+if (UI.nudgeLeft) UI.nudgeLeft.addEventListener('click', () => nudgeCurrentPosition(-0.4, 0));
+if (UI.nudgeRight) UI.nudgeRight.addEventListener('click', () => nudgeCurrentPosition(0.4, 0));
+if (UI.snapCorridorBtn) {
+  UI.snapCorridorBtn.addEventListener('click', () => {
+    if (!startPos) {
+      UI.statusMsg.innerText = 'Set your current position before snapping.';
+      return;
+    }
+    setCurrentPosition(startPos, 'Current position snapped to nearest corridor.');
+  });
+}
 
 UI.floorSelect.addEventListener('change', (e) => loadFloorData(e.target.value));
 

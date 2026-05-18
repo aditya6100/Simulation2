@@ -164,6 +164,46 @@
         color: #fff;
         font-size: 13px;
       }
+      .nudge-panel {
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px;
+        padding: 8px;
+        margin-bottom: 10px;
+        background: rgba(255,255,255,0.05);
+      }
+      .nudge-panel span {
+        display: block;
+        margin-bottom: 7px;
+        color: rgba(255,255,255,0.72);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .nudge-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .nudge-grid button,
+      .snap-btn {
+        min-height: 32px;
+        background: rgba(255,255,255,0.08);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 800;
+      }
+      #nudge-forward { grid-column: 2; }
+      #nudge-left { grid-column: 1; }
+      #nudge-right { grid-column: 3; }
+      #nudge-back { grid-column: 2; }
+      .snap-btn {
+        width: 100%;
+        margin-top: 6px;
+        color: #00ffcc;
+      }
       @media (max-width: 760px) {
         #nav-ui {
           left: 10px;
@@ -217,6 +257,17 @@
       <div class="pick-row">
         <button id="pick-start-btn" class="pick-btn active" type="button">Pick Current</button>
         <button id="pick-dest-btn" class="pick-btn" type="button">Pick Destination</button>
+      </div>
+
+      <div class="nudge-panel" aria-label="Current position correction">
+        <span>Adjust Current Position</span>
+        <div class="nudge-grid">
+          <button id="nudge-forward" type="button">Forward</button>
+          <button id="nudge-left" type="button">Left</button>
+          <button id="nudge-right" type="button">Right</button>
+          <button id="nudge-back" type="button">Back</button>
+        </div>
+        <button id="snap-corridor-btn" class="snap-btn" type="button">Snap to Corridor</button>
       </div>
 
       <button id="go-btn">Start Navigation</button>
