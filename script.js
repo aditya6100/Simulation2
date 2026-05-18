@@ -53,7 +53,8 @@ const UI = {
   mobileSettingsClose: document.getElementById('mobileSettingsClose'),
   controlShapeSelect: document.getElementById('controlShapeSelect'),
   controlSizeSelect: document.getElementById('controlSizeSelect'),
-  mobileLayoutReset: document.getElementById('mobileLayoutReset')
+  mobileLayoutReset: document.getElementById('mobileLayoutReset'),
+  mobileLayoutDone: document.getElementById('mobileLayoutDone')
 };
 
 const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -285,9 +286,14 @@ function drawSimulationMinimap() {
 
 function resizeSimulationViewport() {
   if (!renderer || !camera) return;
-  const width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
-  const height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
+  const vv = window.visualViewport;
+  const width = Math.max(1, Math.round(vv?.width || window.innerWidth || document.documentElement.clientWidth || 1));
+  const height = Math.max(1, Math.round(vv?.height || window.innerHeight || document.documentElement.clientHeight || 1));
+  document.documentElement.style.setProperty('--app-vw', `${width}px`);
+  document.documentElement.style.setProperty('--app-vh', `${height}px`);
   renderer.setSize(width, height, false);
+  renderer.domElement.style.width = `${width}px`;
+  renderer.domElement.style.height = `${height}px`;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   drawSimulationMinimap();
@@ -4240,6 +4246,7 @@ function setupMobileControls(ctrl) {
   let lookLastY = 0;
   const isControlTarget = (target) => !!target.closest?.('#mobileControls, #mobileSettingsPanel, #liftDashboard, #arFloorDialog, #overlay');
   renderer.domElement.addEventListener('pointerdown', (event) => {
+    if (document.body.classList.contains('layout-editing')) return;
     if (!ctrl.mobileActive || isControlTarget(event.target)) return;
     lookPointerId = event.pointerId;
     lookLastX = event.clientX;
@@ -4320,6 +4327,11 @@ function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
 
 function setupMobileLayoutSettings() {
   applyMobileLayoutSettings();
+  const closeEditor = () => {
+    document.body.classList.remove('layout-editing');
+    UI.mobileSettingsPanel?.classList.remove('active');
+    UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'true');
+  };
   const updateShape = () => {
     const settings = getMobileLayoutSettings();
     settings.shape = UI.controlShapeSelect?.value || 'rounded';
@@ -4337,11 +4349,10 @@ function setupMobileLayoutSettings() {
     });
   }
   if (UI.mobileSettingsClose) {
-    UI.mobileSettingsClose.addEventListener('click', () => {
-      document.body.classList.remove('layout-editing');
-      UI.mobileSettingsPanel?.classList.remove('active');
-      UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'true');
-    });
+    UI.mobileSettingsClose.addEventListener('click', closeEditor);
+  }
+  if (UI.mobileLayoutDone) {
+    UI.mobileLayoutDone.addEventListener('click', closeEditor);
   }
   if (UI.mobileLayoutReset) {
     UI.mobileLayoutReset.addEventListener('click', () => {
@@ -4352,9 +4363,7 @@ function setupMobileLayoutSettings() {
   if (UI.mobileSettingsPanel) {
     UI.mobileSettingsPanel.addEventListener('click', (event) => {
       if (event.target === UI.mobileSettingsPanel) {
-        document.body.classList.remove('layout-editing');
-        UI.mobileSettingsPanel.classList.remove('active');
-        UI.mobileSettingsPanel.setAttribute('aria-hidden', 'true');
+        closeEditor();
       }
     });
   }
@@ -4364,8 +4373,11 @@ function setupMobileLayoutSettings() {
     if (!el) return;
     let activeId = null;
     const moveTo = (event) => {
-      const x = THREE.MathUtils.clamp((event.clientX / Math.max(1, window.innerWidth)) * 100, 5, 95);
-      const y = THREE.MathUtils.clamp((event.clientY / Math.max(1, window.innerHeight)) * 100, 5, 95);
+      const vv = window.visualViewport;
+      const width = Math.max(1, vv?.width || window.innerWidth);
+      const height = Math.max(1, vv?.height || window.innerHeight);
+      const x = THREE.MathUtils.clamp((event.clientX / width) * 100, 5, 95);
+      const y = THREE.MathUtils.clamp((event.clientY / height) * 100, 5, 95);
       el.style.left = `${x}%`;
       el.style.top = `${y}%`;
       el.style.right = 'auto';
@@ -4605,6 +4617,10 @@ async function init() {
   window.addEventListener('resize', () => {
     resizeSimulationViewport();
     updateLandscapePrompt();
+  });
+  window.visualViewport?.addEventListener('resize', () => {
+    resizeSimulationViewport();
+    setTimeout(resizeSimulationViewport, 250);
   });
   window.addEventListener('orientationchange', () => {
     setTimeout(resizeSimulationViewport, 120);

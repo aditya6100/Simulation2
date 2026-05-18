@@ -12,6 +12,8 @@
 html, body{
   width: 100%;
   height: 100%;
+  width: var(--app-vw, 100vw);
+  height: var(--app-vh, 100vh);
   margin: 0;
   overflow: hidden;
   background: #dbeafe;
@@ -22,6 +24,13 @@ html, body{
 
 canvas{
   display: block;
+}
+
+body > canvas{
+  position: fixed;
+  inset: 0;
+  width: var(--app-vw, 100vw) !important;
+  height: var(--app-vh, 100vh) !important;
 }
 
 #crosshair{
@@ -157,6 +166,8 @@ canvas{
 #ui{
   position: fixed;
   inset: 0;
+  width: var(--app-vw, 100vw);
+  height: var(--app-vh, 100vh);
   pointer-events: none;
 }
 
@@ -807,6 +818,8 @@ canvas{
 #mobileControls{
   position: fixed;
   inset: 0;
+  width: var(--app-vw, 100vw);
+  height: var(--app-vh, 100vh);
   z-index: 6;
   pointer-events: none;
   display: none;
@@ -919,29 +932,28 @@ body[data-control-size="large"] .touch-action-btn{
 
 #mobileSettingsPanel{
   position: fixed;
-  inset: 0;
+  right: 10px;
+  top: 10px;
   z-index: 32;
   display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(15, 23, 42, 0.42);
-  pointer-events: auto;
+  width: min(300px, calc(var(--app-vw, 100vw) - 20px));
+  pointer-events: none;
   box-sizing: border-box;
 }
 
 #mobileSettingsPanel.active{
-  display: flex;
+  display: block;
 }
 
 .mobile-settings-card{
-  width: min(340px, calc(100vw - 30px));
+  width: 100%;
   border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: rgba(255,255,255,0.96);
   padding: 16px;
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.26);
   box-sizing: border-box;
+  pointer-events: auto;
 }
 
 .mobile-settings-card p{
@@ -1001,6 +1013,18 @@ body[data-control-size="large"] .touch-action-btn{
   border-radius: 6px;
   background: rgba(20,184,166,0.12);
   color: var(--accent);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.layout-done-btn{
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid rgba(15,118,110,0.55);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 850;
   cursor: pointer;
 }
