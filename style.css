@@ -651,6 +651,47 @@ body > canvas{
   margin-bottom: 14px;
 }
 
+.ar-options-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ar-options-grid label{
+  margin: 0;
+}
+
+.ar-options-grid select,
+.ar-options-grid input{
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.96);
+  color: #0f172a;
+  padding: 7px 8px;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.ar-placement-controls{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ar-placement-controls button{
+  min-height: 36px;
+  border: 1px solid rgba(15,23,42,0.14);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.92);
+  color: #0f172a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .ar-start-btn{
   width: 100%;
   min-height: 46px;

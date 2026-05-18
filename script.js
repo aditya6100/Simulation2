@@ -30,6 +30,17 @@ const UI = {
   arFloorBtnOverlay: document.getElementById('arFloorBtnOverlay'),
   arFloorDialog: document.getElementById('arFloorDialog'),
   arFloorSelect: document.getElementById('arFloorSelect'),
+  arQualitySelect: document.getElementById('arQualitySelect'),
+  arViewModeSelect: document.getElementById('arViewModeSelect'),
+  arOpacityRange: document.getElementById('arOpacityRange'),
+  arLabelsSelect: document.getElementById('arLabelsSelect'),
+  arPathFromSelect: document.getElementById('arPathFromSelect'),
+  arPathToSelect: document.getElementById('arPathToSelect'),
+  arHighlightSelect: document.getElementById('arHighlightSelect'),
+  arRotateLeft: document.getElementById('arRotateLeft'),
+  arRotateRight: document.getElementById('arRotateRight'),
+  arScaleDown: document.getElementById('arScaleDown'),
+  arScaleUp: document.getElementById('arScaleUp'),
   arFloorStart: document.getElementById('arFloorStart'),
   arFloorClose: document.getElementById('arFloorClose'),
   arStatus: document.getElementById('arStatus'),
@@ -137,7 +148,18 @@ const arState = {
   savedSceneBackground: null,
   savedSceneFog: null,
   webXRButton: null,
-  pendingFloorIdx: 4
+  pendingFloorIdx: 4,
+  rotationOffset: 0,
+  scale: 1,
+  settings: {
+    quality: 'detailed',
+    viewMode: 'simulation',
+    opacity: 0.88,
+    labels: true,
+    pathFrom: '',
+    pathTo: '',
+    highlight: ''
+  }
 };
 
 // --- 2. PHYSICS & COLLISION ---
@@ -324,6 +346,88 @@ function updateARStatus(message) {
 function syncARFloorSelectionFromMain() {
   if (!UI.arFloorSelect || !UI.floorSelect) return;
   UI.arFloorSelect.value = UI.floorSelect.value;
+  populateARRoomControls();
+}
+
+function getARSettingsFromUI() {
+  arState.settings.quality = UI.arQualitySelect?.value || arState.settings.quality;
+  arState.settings.viewMode = UI.arViewModeSelect?.value || arState.settings.viewMode;
+  arState.settings.opacity = Math.max(0.35, Math.min(1, Number(UI.arOpacityRange?.value || 88) / 100));
+  arState.settings.labels = (UI.arLabelsSelect?.value || 'show') === 'show';
+  arState.settings.pathFrom = UI.arPathFromSelect?.value || '';
+  arState.settings.pathTo = UI.arPathToSelect?.value || '';
+  arState.settings.highlight = UI.arHighlightSelect?.value || '';
+  return arState.settings;
+}
+
+function getARRoomOptions(floorIdx = getSelectedFloorIndex()) {
+  const floorKey = ALL_FLOORS[floorIdx];
+  const floor = minimapWorld?.floorDataMap?.get(floorKey);
+  const names = [...new Set((floor?.roomLabels || []).map((r) => String(r.name || '').trim()).filter(Boolean))];
+  return names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function fillARSelect(select, names, emptyLabel) {
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '';
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = emptyLabel;
+  select.appendChild(empty);
+  names.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+  select.value = names.includes(current) ? current : '';
+}
+
+function populateARRoomControls() {
+  const names = getARRoomOptions();
+  fillARSelect(UI.arPathFromSelect, names, 'None');
+  fillARSelect(UI.arPathToSelect, names, 'None');
+  fillARSelect(UI.arHighlightSelect, names, 'None');
+}
+
+function applyARTransform() {
+  if (!arState.group) return;
+  arState.group.rotation.y = arState.rotationOffset;
+  arState.group.scale.setScalar(arState.scale);
+}
+
+function refreshARFloorModel() {
+  getARSettingsFromUI();
+  const floorIdx = getSelectedFloorIndex();
+  const old = arState.group;
+  const oldPosition = old?.position.clone();
+  const group = createARFloorModel(floorIdx);
+  if (!group) return;
+  if (oldPosition) group.position.copy(oldPosition);
+  scene.add(group);
+  arState.group = group;
+  applyARTransform();
+  if (old) {
+    scene.remove(old);
+    disposeObjectTree(old);
+  }
+  if (arState.preview) arState.preview.group = group;
+}
+
+function placeARModelInFrontOfCamera(distance = 1.45) {
+  if (!arState.group || !camera) return;
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  arState.group.position.copy(camera.position).add(forward.multiplyScalar(distance));
+  arState.group.position.y = Math.max(-0.55, camera.position.y - 1.15);
+  applyARTransform();
+  updateARStatus('AR floorplan placed. Use rotate/scale controls to adjust.');
+}
+
+function adjustARTransform({ rotate = 0, scale = 0 } = {}) {
+  arState.rotationOffset += rotate;
+  arState.scale = THREE.MathUtils.clamp(arState.scale + scale, 0.65, 1.65);
+  applyARTransform();
 }
 
 function openARFloorDialog() {
@@ -412,6 +516,9 @@ function createARTextSprite(text, options = {}) {
 }
 
 function createARFloorModel(floorIdx) {
+  const settings = getARSettingsFromUI();
+  const isFast = settings.quality === 'fast';
+  const isBlueprint = settings.viewMode === 'blueprint';
   const floorKey = ALL_FLOORS[floorIdx];
   const floor = minimapWorld?.floorDataMap?.get(floorKey);
   if (!floor) return null;
@@ -428,15 +535,15 @@ function createARFloorModel(floorIdx) {
   const wallThickness = 0.026;
 
   const floorMat = new THREE.MeshStandardMaterial({
-    color: 0xe8f4f2,
+    color: isBlueprint ? 0xe0f2fe : 0xe8f4f2,
     roughness: 0.62,
     metalness: 0.02,
     transparent: true,
-    opacity: 0.88
+    opacity: settings.opacity
   });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.58, metalness: 0.02 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: isBlueprint ? 0x2563eb : 0xf8fafc, roughness: 0.58, metalness: 0.02 });
   const innerWallMat = wallMat;
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.42, metalness: 0.04 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: isBlueprint ? 0x0f172a : 0x8b5a2b, roughness: 0.42, metalness: 0.04 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.08, metalness: 0.02, transparent: true, opacity: 0.58 });
   const deskMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.22, metalness: 0.18 });
   const deskTopMat = deskMat;
@@ -494,10 +601,23 @@ function createARFloorModel(floorIdx) {
     const z2 = (door.z2 - cz) * scale;
     const len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.01) return;
+    const doorGroup = new THREE.Group();
+    doorGroup.position.set((x1 + x2) * 0.5, wallHeight * 0.31 + 0.018, (z1 + z2) * 0.5);
+    doorGroup.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight * 0.62, wallThickness * 1.35), doorMat);
-    mesh.position.set((x1 + x2) * 0.5, wallHeight * 0.31 + 0.018, (z1 + z2) * 0.5);
-    mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-    group.add(mesh);
+    doorGroup.add(mesh);
+    if (!isFast && !isBlueprint) {
+      const frameMat = metalMat;
+      const h = wallHeight * 0.68;
+      const sideA = new THREE.Mesh(new THREE.BoxGeometry(0.01, h, wallThickness * 2.2), frameMat);
+      sideA.position.set(-len * 0.5, h * 0.02, 0);
+      const sideB = sideA.clone();
+      sideB.position.x = len * 0.5;
+      const top = new THREE.Mesh(new THREE.BoxGeometry(len, 0.01, wallThickness * 2.2), frameMat);
+      top.position.y = h * 0.5;
+      doorGroup.add(sideA, sideB, top);
+    }
+    group.add(doorGroup);
   });
 
   (floor.windows || []).forEach((win) => {
@@ -507,10 +627,26 @@ function createARFloorModel(floorIdx) {
     const z2 = (win.z2 - cz) * scale;
     const len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.01) return;
+    const winGroup = new THREE.Group();
+    winGroup.position.set((x1 + x2) * 0.5, wallHeight * 0.56, (z1 + z2) * 0.5);
+    winGroup.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(len, wallHeight * 0.34, wallThickness * 1.5), glassMat);
-    frame.position.set((x1 + x2) * 0.5, wallHeight * 0.56, (z1 + z2) * 0.5);
-    frame.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-    group.add(frame);
+    winGroup.add(frame);
+    if (!isFast && !isBlueprint) {
+      const railH = 0.008;
+      const sideW = 0.008;
+      const wh = wallHeight * 0.38;
+      const top = new THREE.Mesh(new THREE.BoxGeometry(len, railH, wallThickness * 1.9), metalMat);
+      top.position.y = wh * 0.5;
+      const bottom = top.clone();
+      bottom.position.y = -wh * 0.5;
+      const sideA = new THREE.Mesh(new THREE.BoxGeometry(sideW, wh, wallThickness * 1.9), metalMat);
+      sideA.position.x = -len * 0.5;
+      const sideB = sideA.clone();
+      sideB.position.x = len * 0.5;
+      winGroup.add(top, bottom, sideA, sideB);
+    }
+    group.add(winGroup);
   });
 
   const addFurniturePart = (parent, lx, ly, lz, w, h, d, mat) => {
@@ -845,6 +981,8 @@ function createARFloorModel(floorIdx) {
   };
 
   (floor.furniture || []).forEach((item) => {
+    if (isBlueprint) return;
+    if (isFast && !/table|desk|rack|bench|laptop|pc|monitor|board|tv/i.test(String(item.name || ''))) return;
     addFurnitureGroup(item);
   });
 
@@ -861,15 +999,56 @@ function createARFloorModel(floorIdx) {
     if (room.board) addARSmartBoard(room.board.x, room.board.z, room.board.yaw || 0);
   });
 
-  Object.entries(SMART_BOARD_PLACEMENTS[floorKey] || {}).forEach(([, board]) => {
-    addARSmartBoard(board.x, board.z, board.yaw || 0);
+  if (!isBlueprint) {
+    Object.entries(SMART_BOARD_PLACEMENTS[floorKey] || {}).forEach(([, board]) => {
+      addARSmartBoard(board.x, board.z, board.yaw || 0);
+    });
+  }
+
+  if (!isFast && !isBlueprint) addARFacultyCabins();
+  if (!isFast) addARLabCharts();
+
+  const roomByName = new Map();
+  (floor.roomLabels || []).forEach((room) => {
+    const name = String(room.name || '').trim();
+    if (name && !roomByName.has(name)) roomByName.set(name, room);
   });
 
-  addARFacultyCabins();
-  addARLabCharts();
+  const addARRoomMarker = (room, color = 0xfacc15, radius = 0.12) => {
+    if (!room) return;
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(radius * scale, (radius + 0.10) * scale, 36),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.88, side: THREE.DoubleSide })
+    );
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.set((room.x - cx) * scale, 0.028, (room.z - cz) * scale);
+    group.add(marker);
+  };
+
+  const highlightedRoom = roomByName.get(settings.highlight);
+  if (highlightedRoom) addARRoomMarker(highlightedRoom, 0xfacc15, 0.18);
+
+  const pathStart = roomByName.get(settings.pathFrom);
+  const pathEnd = roomByName.get(settings.pathTo);
+  if (pathStart && pathEnd && pathStart !== pathEnd) {
+    const corridorX = (pathStart.x < 48 && pathEnd.x < 48) ? 46.85 : (pathStart.x > 48 && pathEnd.x > 48 ? 49.25 : 48.45);
+    const route = [
+      new THREE.Vector3((pathStart.x - cx) * scale, 0.035, (pathStart.z - cz) * scale),
+      new THREE.Vector3((corridorX - cx) * scale, 0.035, (pathStart.z - cz) * scale),
+      new THREE.Vector3((corridorX - cx) * scale, 0.035, (pathEnd.z - cz) * scale),
+      new THREE.Vector3((pathEnd.x - cx) * scale, 0.035, (pathEnd.z - cz) * scale)
+    ];
+    const pathLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(route),
+      new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 4 })
+    );
+    group.add(pathLine);
+    addARRoomMarker(pathStart, 0x22c55e, 0.12);
+    addARRoomMarker(pathEnd, 0xef4444, 0.12);
+  }
 
   const placedARLabels = [];
-  (floor.roomLabels || []).forEach((room, index) => {
+  if (settings.labels && !(isFast && floor.roomLabels?.length > 10)) (floor.roomLabels || []).forEach((room, index) => {
     const labelText = String(room.name || '').trim();
     if (!labelText) return;
     const lx = (room.x - cx) * scale;
@@ -1014,7 +1193,9 @@ async function showFloorPreview(message, options = {}) {
   }
 
   group.position.set(0, 0, 0);
-  group.rotation.y = -0.35;
+  arState.rotationOffset = arState.rotationOffset || -0.35;
+  group.rotation.y = arState.rotationOffset;
+  group.scale.setScalar(arState.scale);
   scene.add(group);
   arState.group = group;
   setSceneForAR(true);
@@ -1037,10 +1218,20 @@ async function showFloorPreview(message, options = {}) {
       <strong>${FLOOR_LABELS[floorIdx]} AR floor model</strong>
       <span>${cameraMessage || 'Showing 2m preview. Use a supported WebXR phone browser for tracked AR.'}</span>
     </div>
+    <div class="ar-placement-controls">
+      <button type="button" data-ar-action="rotate-left">Rotate -</button>
+      <button type="button" data-ar-action="scale-down">Scale -</button>
+      <button type="button" data-ar-action="scale-up">Scale +</button>
+      <button type="button" data-ar-action="rotate-right">Rotate +</button>
+    </div>
     <button type="button" aria-label="Close AR floor preview">Close</button>
   `;
   document.body.appendChild(panel);
-  panel.querySelector('button').addEventListener('click', closeFloorPreview);
+  panel.querySelector('[aria-label="Close AR floor preview"]').addEventListener('click', closeFloorPreview);
+  panel.querySelector('[data-ar-action="rotate-left"]')?.addEventListener('click', () => adjustARTransform({ rotate: -Math.PI / 12 }));
+  panel.querySelector('[data-ar-action="rotate-right"]')?.addEventListener('click', () => adjustARTransform({ rotate: Math.PI / 12 }));
+  panel.querySelector('[data-ar-action="scale-down"]')?.addEventListener('click', () => adjustARTransform({ scale: -0.08 }));
+  panel.querySelector('[data-ar-action="scale-up"]')?.addEventListener('click', () => adjustARTransform({ scale: 0.08 }));
 
   arState.preview = {
     group,
@@ -4994,7 +5185,8 @@ async function init() {
     setSceneForAR(true);
     if (arState.group) {
       arState.group.position.set(0, -0.45, -1.5);
-      arState.group.rotation.y = 0;
+      arState.group.rotation.y = arState.rotationOffset;
+      arState.group.scale.setScalar(arState.scale);
     }
     updateARStatus(`${FLOOR_LABELS[arState.pendingFloorIdx]} is showing in camera AR.`);
   });
@@ -5009,6 +5201,9 @@ async function init() {
     if (ctrl) ctrl.enabled = arState.wasControllerEnabled && !!document.pointerLockElement;
     updateARStatus('Select floor and start AR');
   });
+  const arController = renderer.xr.getController(0);
+  arController.addEventListener('select', () => placeARModelInFrontOfCamera(1.45));
+  scene.add(arController);
   camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
   scene.add(camera);
   setupFlashlight();
@@ -5039,8 +5234,27 @@ async function init() {
     });
   }
   syncARFloorSelectionFromMain();
+  [UI.arQualitySelect, UI.arViewModeSelect, UI.arOpacityRange, UI.arLabelsSelect, UI.arPathFromSelect, UI.arPathToSelect, UI.arHighlightSelect].forEach((el) => {
+    if (!el) return;
+    el.addEventListener('change', () => {
+      getARSettingsFromUI();
+      if (arState.group) refreshARFloorModel();
+    });
+    el.addEventListener('input', () => {
+      getARSettingsFromUI();
+      if (el === UI.arOpacityRange && arState.group) refreshARFloorModel();
+    });
+  });
+  if (UI.arRotateLeft) UI.arRotateLeft.addEventListener('click', () => adjustARTransform({ rotate: -Math.PI / 12 }));
+  if (UI.arRotateRight) UI.arRotateRight.addEventListener('click', () => adjustARTransform({ rotate: Math.PI / 12 }));
+  if (UI.arScaleDown) UI.arScaleDown.addEventListener('click', () => adjustARTransform({ scale: -0.08 }));
+  if (UI.arScaleUp) UI.arScaleUp.addEventListener('click', () => adjustARTransform({ scale: 0.08 }));
   if (UI.arFloorBtn) UI.arFloorBtn.addEventListener('click', openARFloorDialog);
   if (UI.arFloorBtnOverlay) UI.arFloorBtnOverlay.addEventListener('click', openARFloorDialog);
+  if (UI.arFloorSelect) UI.arFloorSelect.addEventListener('change', () => {
+    populateARRoomControls();
+    if (arState.preview || arState.session) refreshARFloorModel();
+  });
   if (UI.arFloorStart) UI.arFloorStart.addEventListener('click', startFloorAR);
   if (UI.arFloorClose) UI.arFloorClose.addEventListener('click', closeARFloorDialog);
   if (UI.arFloorDialog) {
@@ -5087,6 +5301,7 @@ async function init() {
       UI.floorSelectOverlay.selectedIndex = e.target.selectedIndex;
     }
     if (UI.arFloorSelect) UI.arFloorSelect.value = e.target.value;
+    populateARRoomControls();
     const fIdx = ALL_FLOORS.length - 1 - e.target.selectedIndex;
     const safe = world.floorSafeSpawns[fIdx];
     if (safe) ctrl.pos.copy(safe);

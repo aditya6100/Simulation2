@@ -186,6 +186,44 @@
           <option value="1stfloor">1st Floor</option>
           <option value="groundgloor">Ground Floor</option>
         </select>
+        <div class="ar-options-grid">
+          <label>Quality
+            <select id="arQualitySelect">
+              <option value="detailed" selected>Detailed</option>
+              <option value="fast">Fast</option>
+            </select>
+          </label>
+          <label>View
+            <select id="arViewModeSelect">
+              <option value="simulation" selected>Simulation Match</option>
+              <option value="blueprint">Blueprint</option>
+            </select>
+          </label>
+          <label>Opacity
+            <input id="arOpacityRange" type="range" min="35" max="100" value="88" />
+          </label>
+          <label>Labels
+            <select id="arLabelsSelect">
+              <option value="show" selected>Show</option>
+              <option value="hide">Hide</option>
+            </select>
+          </label>
+          <label>From
+            <select id="arPathFromSelect"></select>
+          </label>
+          <label>To
+            <select id="arPathToSelect"></select>
+          </label>
+          <label>Highlight
+            <select id="arHighlightSelect"></select>
+          </label>
+        </div>
+        <div class="ar-placement-controls" aria-label="AR placement controls">
+          <button id="arRotateLeft" type="button">Rotate -</button>
+          <button id="arScaleDown" type="button">Scale -</button>
+          <button id="arScaleUp" type="button">Scale +</button>
+          <button id="arRotateRight" type="button">Rotate +</button>
+        </div>
         <button id="arFloorStart" class="ar-start-btn" type="button">Start AR</button>
         <p>Shows the selected floor as a compact 2m augmented model using the simulation floor data.</p>
       </div>
