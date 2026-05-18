@@ -831,73 +831,107 @@ body > canvas{
   display: block;
 }
 
-.wasd-pad{
+.mobile-quick-bar{
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  z-index: 2;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.56);
+  border: 1px solid rgba(255,255,255,0.18);
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.mobile-quick-bar button,
+.mobile-quick-bar strong{
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.90);
+  color: #0f172a;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.mobile-quick-bar strong{
+  display: inline-flex;
+  align-items: center;
+  background: rgba(20,184,166,0.90);
+  color: #ffffff;
+}
+
+.joystick-pad{
   position: absolute;
   left: 18px;
   bottom: 18px;
-  width: 156px;
-  height: 116px;
-  display: grid;
-  grid-template-columns: repeat(3, 48px);
-  grid-template-rows: repeat(2, 48px);
-  gap: 8px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(15, 23, 42, 0.36);
+  box-shadow: inset 0 0 24px rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.24);
   pointer-events: auto;
   touch-action: none;
   transform: translate(-50%, -50%);
-}
-
-.wasd-btn{
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.24);
-  background: rgba(15, 23, 42, 0.58);
-  color: #ffffff;
-  font-weight: 900;
-  font-size: 16px;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.24);
   backdrop-filter: blur(5px);
-  touch-action: none;
 }
 
-body[data-control-size="compact"] .wasd-pad{
-  width: 132px;
-  height: 98px;
-  grid-template-columns: repeat(3, 40px);
-  grid-template-rows: repeat(2, 40px);
-  gap: 6px;
+.joystick-stick{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.24);
+  background: rgba(20, 184, 166, 0.72);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+  transform: translate(-50%, -50%);
 }
 
-body[data-control-size="large"] .wasd-pad{
-  width: 186px;
-  height: 138px;
-  grid-template-columns: repeat(3, 58px);
-  grid-template-rows: repeat(2, 58px);
-  gap: 10px;
+body[data-control-size="compact"] .joystick-pad{
+  width: 112px;
+  height: 112px;
 }
 
-body[data-control-shape="circle"] .wasd-btn,
+body[data-control-size="compact"] .joystick-stick{
+  width: 46px;
+  height: 46px;
+}
+
+body[data-control-size="large"] .joystick-pad{
+  width: 156px;
+  height: 156px;
+}
+
+body[data-control-size="large"] .joystick-stick{
+  width: 64px;
+  height: 64px;
+}
+
+body[data-control-shape="circle"] .joystick-pad,
 body[data-control-shape="circle"] .touch-action-btn{
   border-radius: 50%;
 }
 
-body[data-control-shape="square"] .wasd-btn,
+body[data-control-shape="square"] .joystick-pad,
 body[data-control-shape="square"] .touch-action-btn{
   border-radius: 4px;
 }
 
-body[data-control-shape="pill"] .wasd-btn,
+body[data-control-shape="pill"] .joystick-pad,
 body[data-control-shape="pill"] .touch-action-btn{
   border-radius: 999px;
 }
-
-.wasd-btn.active{
-  background: rgba(20, 184, 166, 0.72);
-  border-color: rgba(94, 234, 212, 0.88);
-}
-
-.wasd-w{ grid-column: 2; grid-row: 1; }
-.wasd-a{ grid-column: 1; grid-row: 2; }
-.wasd-s{ grid-column: 2; grid-row: 2; }
-.wasd-d{ grid-column: 3; grid-row: 2; }
 
 .touch-action-btn{
   position: absolute;
@@ -938,7 +972,7 @@ body[data-control-size="large"] .touch-action-btn{
   top: 10px;
   z-index: 32;
   display: none;
-  width: min(300px, calc(var(--app-vw, 100vw) - 20px));
+  width: min(230px, calc(var(--app-vw, 100vw) - 20px));
   pointer-events: none;
   box-sizing: border-box;
 }
@@ -952,17 +986,17 @@ body[data-control-size="large"] .touch-action-btn{
   border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: rgba(255,255,255,0.96);
-  padding: 16px;
+  padding: 10px;
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.26);
   box-sizing: border-box;
   pointer-events: auto;
 }
 
 .mobile-settings-card p{
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .mobile-settings-head{
@@ -970,11 +1004,11 @@ body[data-control-size="large"] .touch-action-btn{
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .mobile-settings-head strong{
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .mobile-settings-head button{
@@ -988,7 +1022,7 @@ body[data-control-size="large"] .touch-action-btn{
 
 .mobile-settings-card label{
   display: block;
-  margin: 12px 0 6px;
+  margin: 8px 0 4px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 850;
@@ -998,7 +1032,7 @@ body[data-control-size="large"] .touch-action-btn{
 
 .mobile-settings-card select{
   width: 100%;
-  min-height: 42px;
+  min-height: 32px;
   border: 1px solid rgba(15, 23, 42, 0.16);
   border-radius: 6px;
   background: #ffffff;
@@ -1009,8 +1043,8 @@ body[data-control-size="large"] .touch-action-btn{
 
 .layout-reset-btn{
   width: 100%;
-  min-height: 42px;
-  margin-top: 14px;
+  min-height: 34px;
+  margin-top: 10px;
   border: 1px solid rgba(15,118,110,0.36);
   border-radius: 6px;
   background: rgba(20,184,166,0.12);
@@ -1021,8 +1055,8 @@ body[data-control-size="large"] .touch-action-btn{
 
 .layout-done-btn{
   width: 100%;
-  min-height: 42px;
-  margin-top: 10px;
+  min-height: 34px;
+  margin-top: 8px;
   border: 1px solid rgba(15,118,110,0.55);
   border-radius: 6px;
   background: var(--accent);
@@ -1036,7 +1070,8 @@ body.layout-editing #minimap-container,
 body.layout-editing #panel-left-bottom,
 body.layout-editing #movePad,
 body.layout-editing #mobileInteract,
-body.layout-editing #mobileSettingsBtn{
+body.layout-editing #mobileSettingsBtn,
+body.layout-editing #mobileQuickBar{
   outline: 2px dashed rgba(20, 184, 166, 0.95);
   outline-offset: 4px;
   box-shadow: 0 0 0 9999px transparent;
@@ -1048,7 +1083,8 @@ body.layout-editing #minimap-container::before,
 body.layout-editing #panel-left-bottom::before,
 body.layout-editing #movePad::before,
 body.layout-editing #mobileInteract::before,
-body.layout-editing #mobileSettingsBtn::before{
+body.layout-editing #mobileSettingsBtn::before,
+body.layout-editing #mobileQuickBar::before{
   content: "Drag";
   position: absolute;
   left: 50%;
@@ -1081,6 +1117,14 @@ body.layout-editing #mobileSettingsBtn::before{
   #panel-left-top .panel-body,
   #panel-right-top .panel-body:first-of-type{
     display: none;
+  }
+
+  #panel-right-top{
+    display: none;
+  }
+
+  .mobile-quick-bar{
+    display: flex;
   }
 
   #panel-left-top{ left: 8px; top: 8px; }
@@ -1218,6 +1262,11 @@ body.layout-editing #mobileSettingsBtn::before{
   #panel-right-top{
     right: 8px;
     top: 8px;
+    display: none;
+  }
+
+  .mobile-quick-bar{
+    display: flex;
   }
 
   #panel-left-bottom{
@@ -1276,8 +1325,6 @@ body.layout-editing #mobileSettingsBtn::before{
     height: 100%;
   }
 
-  #panel-right-top .panel-title:first-child,
-  #panel-right-top .panel-body:first-of-type,
   #panel-left-top .panel-body{
     display: none;
   }
@@ -1299,14 +1346,11 @@ body.layout-editing #mobileSettingsBtn::before{
     padding: 4px 6px !important;
   }
 
-  .wasd-pad{
+  .joystick-pad{
     left: 14px;
     bottom: 12px;
-    width: 132px;
-    height: 98px;
-    grid-template-columns: repeat(3, 40px);
-    grid-template-rows: repeat(2, 40px);
-    gap: 6px;
+    width: 112px;
+    height: 112px;
   }
 
   .touch-action-btn{

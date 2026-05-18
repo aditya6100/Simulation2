@@ -191,11 +191,14 @@
       </div>
     </div>
     <div id="mobileControls" aria-hidden="true">
-      <div id="movePad" class="wasd-pad" aria-label="Movement controls">
-        <button class="wasd-btn wasd-w" type="button" data-move="KeyW">W</button>
-        <button class="wasd-btn wasd-a" type="button" data-move="KeyA">A</button>
-        <button class="wasd-btn wasd-s" type="button" data-move="KeyS">S</button>
-        <button class="wasd-btn wasd-d" type="button" data-move="KeyD">D</button>
+      <div id="mobileQuickBar" class="mobile-quick-bar" aria-label="Quick floor and quality controls">
+        <button id="mobileFloorDown" type="button">Floor -</button>
+        <strong id="mobileFloorLabel">4th Floor</strong>
+        <button id="mobileFloorUp" type="button">Floor +</button>
+        <button id="mobileQualityBtn" type="button">Performance</button>
+      </div>
+      <div id="movePad" class="joystick-pad" aria-label="Movement joystick">
+        <div class="joystick-stick"></div>
       </div>
       <button id="mobileSettingsBtn" class="touch-action-btn settings-touch-btn" type="button" aria-label="Open mobile settings">SET</button>
       <button id="mobileInteract" class="touch-action-btn" type="button">E</button>
@@ -206,7 +209,7 @@
           <strong id="mobileSettingsTitle">Customize Screen</strong>
           <button id="mobileSettingsClose" type="button" aria-label="Close mobile settings">x</button>
         </div>
-        <p>Drag highlighted controls to place them. Use shape controls for the mobile buttons.</p>
+        <p>Drag controls. Shape changes joystick and action buttons.</p>
         <label for="controlShapeSelect">Control shape</label>
         <select id="controlShapeSelect">
           <option value="rounded">Rounded</option>
