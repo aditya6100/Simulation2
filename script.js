@@ -450,6 +450,15 @@ function createARFloorModel(floorIdx) {
   const potMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.7, metalness: 0.02 });
   const boardMat = new THREE.MeshStandardMaterial({ color: 0x052e2b, roughness: 0.34, metalness: 0.05, emissive: 0x064e3b, emissiveIntensity: 0.18 });
   const edgeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.28 });
+  const cabinWallMat = new THREE.MeshStandardMaterial({ color: 0x87919b, roughness: 0.55, metalness: 0.05 });
+  const cabinGlassMat = new THREE.MeshStandardMaterial({
+    color: 0xc7ecff,
+    transparent: true,
+    opacity: 0.38,
+    roughness: 0.04,
+    metalness: 0.05,
+    depthWrite: false
+  });
 
   const base = new THREE.Mesh(new THREE.BoxGeometry(mapW * scale, 0.018, mapD * scale), floorMat);
   base.position.y = 0;
@@ -571,6 +580,7 @@ function createARFloorModel(floorIdx) {
   const addFurnitureGroup = (item) => {
     const n = String(item.name || '').toLowerCase();
     if (n.includes('stair') || n.includes('railing') || n.includes('door') || n.includes('window')) return null;
+    if (n.includes('chair') || n.includes('seat')) return null;
     const isTableLike = n.includes('table') || n.includes('desk') || n.includes('rack');
     const w = isTableLike
       ? THREE.MathUtils.clamp(item.width || 0.65, 0.22, 4.5)
@@ -584,9 +594,7 @@ function createARFloorModel(floorIdx) {
     fg.position.set((item.x - cx) * scale, 0.026, (item.z - cz) * scale);
     fg.rotation.y = yaw;
 
-    if (n.includes('chair') || n.includes('seat')) {
-      addARChair(fg, Math.min(w, 0.52), Math.min(d, 0.52));
-    } else if (n.includes('bench')) {
+    if (n.includes('bench')) {
       addFurniturePart(fg, 0, 0.76, -0.24, Math.max(1.20, w), 0.055, 0.46, benchBlueMat);
       addFurniturePart(fg, 0, 0.46, 0.28, Math.max(1.10, w * 0.92), 0.07, 0.34, benchBlueMat);
       addFurniturePart(fg, 0, 0.74, 0.43, Math.max(1.10, w * 0.92), 0.08, 0.12, benchBlueMat);
@@ -749,6 +757,93 @@ function createARFloorModel(floorIdx) {
     });
   };
 
+  const addARFacultyCabin = (x, z, yaw = 0) => {
+    const cabin = new THREE.Group();
+    cabin.position.set((x - cx) * scale, 0.026, (z - cz) * scale);
+    cabin.rotation.y = yaw;
+
+    const addPanel = (lx, lz, w, d, rot = 0, glass = true) => {
+      const panel = new THREE.Group();
+      panel.position.set(lx * scale, 0, lz * scale);
+      panel.rotation.y = rot;
+      addFurniturePart(panel, 0, 0.50, 0, w, 1.00, d, cabinWallMat);
+      if (glass) {
+        addFurniturePart(panel, 0, 1.60, 0, w, 1.22, Math.max(0.018, d * 0.45), cabinGlassMat);
+        addFurniturePart(panel, 0, 2.23, 0, w, 0.045, d + 0.025, metalMat);
+      } else {
+        addFurniturePart(panel, 0, 1.02, 0, w, 0.05, d + 0.025, metalMat);
+      }
+      cabin.add(panel);
+    };
+
+    addFurniturePart(cabin, 0, 1.20, 0.02, 0.075, 1.62, 1.62, metalMat);
+    addPanel(0, -1.18, 3.20, 0.07);
+    addPanel(-1.63, -0.12, 2.10, 0.07, Math.PI / 2);
+    addPanel(1.63, -0.12, 2.10, 0.07, Math.PI / 2);
+    addPanel(-1.42, 1.00, 0.42, 0.07, 0, false);
+    addPanel(-0.16, 1.00, 0.40, 0.07, 0, false);
+    addPanel(1.32, 1.00, 0.62, 0.07);
+
+    [-0.80, 0.80].forEach((lx, deskIdx) => {
+      const desk = new THREE.Group();
+      desk.position.set(lx * scale, 0, 0.38 * scale);
+      desk.rotation.y = 0;
+      addARLabTable(desk, 1.28, 0.76);
+      addARPC(desk);
+      addFurniturePart(desk, 0.25, 0.82, 0.18, 0.26, 0.035, 0.18, deskIdx === 0 ? new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.6 }) : new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.6 }));
+      addFurniturePart(desk, 0.22, 0.86, 0.22, 0.26, 0.035, 0.18, new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 }));
+      cabin.add(desk);
+
+      const chair = new THREE.Group();
+      chair.position.set(lx * scale, 0, -0.78 * scale);
+      chair.rotation.y = Math.PI;
+      addARChair(chair, 0.68, 0.62);
+      cabin.add(chair);
+    });
+
+    const door = new THREE.Group();
+    door.position.set(0.55 * scale, 0, 1.01 * scale);
+    door.rotation.y = -0.55;
+    addFurniturePart(door, 0, 1.12, 0, 0.82, 1.94, 0.034, cabinGlassMat);
+    addFurniturePart(door, 0, 2.12, 0, 0.92, 0.045, 0.07, metalMat);
+    addFurniturePart(door, -0.46, 1.10, 0, 0.045, 2.02, 0.07, metalMat);
+    addFurniturePart(door, 0.46, 1.10, 0, 0.045, 2.02, 0.07, metalMat);
+    cabin.add(door);
+
+    group.add(cabin);
+  };
+
+  const addARFacultyCabins = () => {
+    const byFloor = {
+      '1stfloor': [
+        { x: 42.35, z: 16.78, yaw: 0 },
+        { x: 42.35, z: 7.48, yaw: 0 },
+        { x: 42.35, z: -1.88, yaw: 0 },
+        { x: 54.10, z: 7.48, yaw: 0 },
+        { x: 54.10, z: -1.88, yaw: 0 }
+      ],
+      '2ndfloor': [
+        { x: 42.35, z: 7.48, yaw: 0 },
+        { x: 42.35, z: -1.88, yaw: 0 },
+        { x: 54.10, z: 7.48, yaw: 0 },
+        { x: 54.10, z: -1.88, yaw: 0 }
+      ],
+      '4thfloor': [
+        { x: 42.35, z: -1.88, yaw: 0 },
+        { x: 54.10, z: 7.48, yaw: 0 },
+        { x: 54.10, z: -1.88, yaw: 0 }
+      ],
+      '5thfloor': [
+        { x: 42.35, z: 16.78, yaw: 0 },
+        { x: 42.35, z: 7.48, yaw: 0 },
+        { x: 42.35, z: -1.88, yaw: 0 },
+        { x: 54.10, z: 7.48, yaw: 0 },
+        { x: 54.10, z: -1.88, yaw: 0 }
+      ]
+    };
+    (byFloor[floorKey] || []).forEach((placement) => addARFacultyCabin(placement.x, placement.z, placement.yaw));
+  };
+
   (floor.furniture || []).forEach((item) => {
     addFurnitureGroup(item);
   });
@@ -770,6 +865,7 @@ function createARFloorModel(floorIdx) {
     addARSmartBoard(board.x, board.z, board.yaw || 0);
   });
 
+  addARFacultyCabins();
   addARLabCharts();
 
   const placedARLabels = [];
