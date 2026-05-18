@@ -296,6 +296,7 @@ function resizeSimulationViewport() {
   renderer.domElement.style.height = `${height}px`;
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  keepMobileLayoutInViewport();
   drawSimulationMinimap();
 }
 
@@ -4322,7 +4323,44 @@ function applyMobileLayoutSettings(settings = getMobileLayoutSettings()) {
     el.style.transform = 'translate(-50%, -50%)';
   });
   try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
-  requestAnimationFrame(() => drawSimulationMinimap());
+  requestAnimationFrame(() => {
+    keepMobileLayoutInViewport();
+    drawSimulationMinimap();
+  });
+}
+
+function keepMobileLayoutInViewport() {
+  const vv = window.visualViewport;
+  const width = Math.max(1, vv?.width || window.innerWidth || 1);
+  const height = Math.max(1, vv?.height || window.innerHeight || 1);
+  const settings = getMobileLayoutSettings();
+  let changed = false;
+
+  MOBILE_DRAG_ITEMS.forEach(({ key, selector }) => {
+    const el = document.querySelector(selector);
+    const pos = settings.positions?.[key];
+    if (!el || !pos) return;
+
+    const rect = el.getBoundingClientRect();
+    const halfW = Math.min(42, Math.max(5, (rect.width / width) * 50));
+    const halfH = Math.min(42, Math.max(5, (rect.height / height) * 50));
+    const x = THREE.MathUtils.clamp(Number(pos.x) || 50, halfW, 100 - halfW);
+    const y = THREE.MathUtils.clamp(Number(pos.y) || 50, halfH, 100 - halfH);
+
+    if (x !== pos.x || y !== pos.y) {
+      settings.positions[key] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+      changed = true;
+    }
+    el.style.left = `${settings.positions[key].x}%`;
+    el.style.top = `${settings.positions[key].y}%`;
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.transform = 'translate(-50%, -50%)';
+  });
+
+  if (changed) {
+    try { localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(settings)); } catch {}
+  }
 }
 
 function setupMobileLayoutSettings() {

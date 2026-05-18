@@ -31,6 +31,7 @@ body > canvas{
   inset: 0;
   width: var(--app-vw, 100vw) !important;
   height: var(--app-vh, 100vh) !important;
+  z-index: 0;
 }
 
 #crosshair{
@@ -168,6 +169,7 @@ body > canvas{
   inset: 0;
   width: var(--app-vw, 100vw);
   height: var(--app-vh, 100vh);
+  z-index: 4;
   pointer-events: none;
 }
 
