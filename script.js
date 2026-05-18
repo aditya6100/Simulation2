@@ -434,14 +434,16 @@ function createARFloorModel(floorIdx) {
     transparent: true,
     opacity: 0.88
   });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f766e, roughness: 0.48, metalness: 0.05 });
-  const innerWallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.62, metalness: 0.02 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.58, metalness: 0.02 });
+  const innerWallMat = wallMat;
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.42, metalness: 0.04 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.08, metalness: 0.02, transparent: true, opacity: 0.58 });
-  const deskMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.55, metalness: 0.04 });
-  const deskTopMat = new THREE.MeshStandardMaterial({ color: 0xb77945, roughness: 0.42, metalness: 0.04 });
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.06 });
-  const pcMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.36, metalness: 0.15 });
+  const deskMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.22, metalness: 0.18 });
+  const deskTopMat = deskMat;
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.34, metalness: 0.55 });
+  const chairMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.55, metalness: 0.15 });
+  const benchBlueMat = new THREE.MeshStandardMaterial({ color: 0x2d78bd, roughness: 0.42, metalness: 0.08 });
+  const pcMat = new THREE.MeshStandardMaterial({ color: 0x1d242d, roughness: 0.4, metalness: 0.3 });
   const screenMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.18, metalness: 0.12, emissive: 0x082f49, emissiveIntensity: 0.25 });
   const fixtureMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.42, metalness: 0.08 });
   const plantMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.75, metalness: 0.02 });
@@ -526,6 +528,46 @@ function createARFloorModel(floorIdx) {
     return mesh;
   };
 
+  const addARLabTable = (parent, w, d) => {
+    addFurniturePart(parent, 0, 0.74, 0, w, 0.03, d, deskTopMat);
+    addFurniturePart(parent, 0, 0.70, d * 0.45, w * 0.94, 0.04, 0.04, metalMat);
+    addFurniturePart(parent, 0, 0.70, -d * 0.45, w * 0.94, 0.04, 0.04, metalMat);
+    addFurniturePart(parent, w * 0.45, 0.70, 0, 0.04, 0.04, d * 0.86, metalMat);
+    addFurniturePart(parent, -w * 0.45, 0.70, 0, 0.04, 0.04, d * 0.86, metalMat);
+    const legW = 0.05;
+    addFurniturePart(parent, -w * 0.46, 0.36, -d * 0.46, legW, 0.72, legW, metalMat);
+    addFurniturePart(parent, w * 0.46, 0.36, -d * 0.46, legW, 0.72, legW, metalMat);
+    addFurniturePart(parent, -w * 0.46, 0.36, d * 0.46, legW, 0.72, legW, metalMat);
+    addFurniturePart(parent, w * 0.46, 0.36, d * 0.46, legW, 0.72, legW, metalMat);
+    addFurniturePart(parent, 0, 0.52, -d * 0.45, w * 0.90, 0.40, 0.015, deskMat);
+  };
+
+  const addARChair = (parent, w = 0.44, d = 0.42) => {
+    addFurniturePart(parent, 0, 0.45, 0, w, 0.035, d, chairMat);
+    addFurniturePart(parent, 0, 0.68, -d * 0.43, w * 0.90, 0.40, 0.035, chairMat);
+    const legW = 0.036;
+    addFurniturePart(parent, -w * 0.43, 0.225, -d * 0.38, legW, 0.45, legW, metalMat);
+    addFurniturePart(parent, w * 0.43, 0.225, -d * 0.38, legW, 0.45, legW, metalMat);
+    addFurniturePart(parent, -w * 0.43, 0.225, d * 0.38, legW, 0.45, legW, metalMat);
+    addFurniturePart(parent, w * 0.43, 0.225, d * 0.38, legW, 0.45, legW, metalMat);
+  };
+
+  const addARLaptop = (parent) => {
+    addFurniturePart(parent, 0, 0.77, 0.02, 0.32, 0.025, 0.24, pcMat);
+    const screen = addFurniturePart(parent, 0, 0.88, -0.09, 0.32, 0.20, 0.02, pcMat);
+    screen.rotation.x = -0.35;
+  };
+
+  const addARPC = (parent) => {
+    addFurniturePart(parent, 0, 0.98, -0.065, 0.50, 0.32, 0.04, pcMat);
+    addFurniturePart(parent, 0, 0.98, -0.043, 0.46, 0.28, 0.01, screenMat);
+    addFurniturePart(parent, 0, 0.84, -0.06, 0.03, 0.18, 0.03, pcMat);
+    addFurniturePart(parent, 0, 0.755, -0.03, 0.22, 0.02, 0.16, pcMat);
+    addFurniturePart(parent, 0, 0.76, 0.22, 0.44, 0.02, 0.16, pcMat);
+    addFurniturePart(parent, 0.28, 0.76, 0.22, 0.06, 0.015, 0.11, pcMat);
+    addFurniturePart(parent, 0.55, 0.24, -0.05, 0.18, 0.48, 0.45, pcMat);
+  };
+
   const addFurnitureGroup = (item) => {
     const n = String(item.name || '').toLowerCase();
     if (n.includes('stair') || n.includes('railing') || n.includes('door') || n.includes('window')) return null;
@@ -543,39 +585,18 @@ function createARFloorModel(floorIdx) {
     fg.rotation.y = yaw;
 
     if (n.includes('chair') || n.includes('seat')) {
-      const seatW = Math.min(w, 0.62);
-      const seatD = Math.min(d, 0.58);
-      addFurniturePart(fg, 0, 0.42, 0, seatW, 0.10, seatD, chairMat);
-      addFurniturePart(fg, 0, 0.78, -seatD * 0.42, seatW, 0.55, 0.08, chairMat);
-      const legW = 0.055;
-      const lx = seatW * 0.38;
-      const lz = seatD * 0.34;
-      addFurniturePart(fg, -lx, 0.21, -lz, legW, 0.42, legW, pcMat);
-      addFurniturePart(fg, lx, 0.21, -lz, legW, 0.42, legW, pcMat);
-      addFurniturePart(fg, -lx, 0.21, lz, legW, 0.42, legW, pcMat);
-      addFurniturePart(fg, lx, 0.21, lz, legW, 0.42, legW, pcMat);
+      addARChair(fg, Math.min(w, 0.52), Math.min(d, 0.52));
     } else if (n.includes('bench')) {
-      addFurniturePart(fg, 0, 0.42, 0, w, 0.10, Math.min(d, 0.42), deskTopMat);
-      addFurniturePart(fg, 0, 0.72, -d * 0.34, w, 0.48, 0.08, chairMat);
-      addFurniturePart(fg, -w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
-      addFurniturePart(fg, w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
+      addFurniturePart(fg, 0, 0.76, -0.24, Math.max(1.20, w), 0.055, 0.46, benchBlueMat);
+      addFurniturePart(fg, 0, 0.46, 0.28, Math.max(1.10, w * 0.92), 0.07, 0.34, benchBlueMat);
+      addFurniturePart(fg, 0, 0.74, 0.43, Math.max(1.10, w * 0.92), 0.08, 0.12, benchBlueMat);
+      addFurniturePart(fg, 0, 0.55, -0.43, Math.max(1.10, w * 0.88), 0.34, 0.025, metalMat);
     } else if (isTableLike) {
-      addFurniturePart(fg, 0, 0.76, 0, w, 0.08, d, deskTopMat);
-      addFurniturePart(fg, 0, 0.48, -d * 0.42, w * 0.85, 0.34, 0.045, deskMat);
-      const legW = 0.055;
-      addFurniturePart(fg, -w * 0.42, 0.38, -d * 0.38, legW, 0.76, legW, pcMat);
-      addFurniturePart(fg, w * 0.42, 0.38, -d * 0.38, legW, 0.76, legW, pcMat);
-      addFurniturePart(fg, -w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
-      addFurniturePart(fg, w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
+      addARLabTable(fg, w, d);
     } else if (n.includes('laptop')) {
-      addFurniturePart(fg, 0, 0.77, 0.12, 0.42, 0.025, 0.18, pcMat);
-      addFurniturePart(fg, 0.25, 0.77, 0.12, 0.055, 0.018, 0.10, pcMat);
-      const screen = addFurniturePart(fg, 0, 0.94, -0.055, 0.46, 0.28, 0.025, screenMat);
-      screen.rotation.x = -0.22;
+      addARLaptop(fg);
     } else if (n.includes('pc') || n.includes('monitor')) {
-      addFurniturePart(fg, 0, 0.20, 0, 0.42, 0.28, 0.035, screenMat);
-      addFurniturePart(fg, 0, 0.06, 0.05, 0.08, 0.12, 0.06, pcMat);
-      addFurniturePart(fg, 0, 0.005, 0.10, 0.30, 0.025, 0.16, pcMat);
+      addARPC(fg);
     } else if (n.includes('tv') || n.includes('board')) {
       addFurniturePart(fg, 0, 0.85, 0, Math.max(0.7, w), Math.max(0.35, h * 0.55), 0.045, boardMat);
       addFurniturePart(fg, 0, 0.85, 0.026, Math.max(0.58, w * 0.86), Math.max(0.26, h * 0.42), 0.012, screenMat);
@@ -603,15 +624,15 @@ function createARFloorModel(floorIdx) {
     const fg = new THREE.Group();
     fg.position.set((x - cx) * scale, 0.026, (z - cz) * scale);
     fg.rotation.y = yaw;
-    const w = options.width || 1.55;
-    const d = options.depth || 0.78;
-    addFurniturePart(fg, 0, 0.72, 0.16, w, 0.08, d * 0.52, deskTopMat);
-    addFurniturePart(fg, 0, 0.44, -0.26, w, 0.10, d * 0.36, chairMat);
-    addFurniturePart(fg, 0, 0.74, -0.48, w, 0.38, 0.055, chairMat);
-    addFurniturePart(fg, -w * 0.42, 0.36, 0.16, 0.055, 0.72, 0.055, pcMat);
-    addFurniturePart(fg, w * 0.42, 0.36, 0.16, 0.055, 0.72, 0.055, pcMat);
-    addFurniturePart(fg, -w * 0.42, 0.24, -0.26, 0.055, 0.48, 0.055, pcMat);
-    addFurniturePart(fg, w * 0.42, 0.24, -0.26, 0.055, 0.48, 0.055, pcMat);
+    const w = options.width || 1.32;
+    addFurniturePart(fg, 0, 0.76, -0.24, w, 0.055, 0.46, benchBlueMat);
+    addFurniturePart(fg, 0, 0.46, 0.28, w * 0.92, 0.07, 0.34, benchBlueMat);
+    addFurniturePart(fg, 0, 0.74, 0.43, w * 0.92, 0.08, 0.12, benchBlueMat);
+    addFurniturePart(fg, 0, 0.55, -0.43, w * 0.88, 0.34, 0.025, metalMat);
+    addFurniturePart(fg, -w * 0.44, 0.36, -0.43, 0.045, 0.72, 0.045, metalMat);
+    addFurniturePart(fg, w * 0.44, 0.36, -0.43, 0.045, 0.72, 0.045, metalMat);
+    addFurniturePart(fg, -w * 0.39, 0.23, 0.16, 0.04, 0.46, 0.04, metalMat);
+    addFurniturePart(fg, w * 0.39, 0.23, 0.16, 0.04, 0.46, 0.04, metalMat);
     group.add(fg);
   };
 
@@ -623,6 +644,109 @@ function createARFloorModel(floorIdx) {
     addFurniturePart(fg, 0, 1.5, 0.032, 1.82, 0.78, 0.018, screenMat);
     addFurniturePart(fg, 0, 0.98, 0.02, 2.1, 0.05, 0.06, pcMat);
     group.add(fg);
+
+    const frontX = Math.sin(yaw);
+    const frontZ = Math.cos(yaw);
+    const desk = new THREE.Group();
+    desk.position.set((x + frontX * 1.35 - cx) * scale, 0.026, (z + frontZ * 1.35 - cz) * scale);
+    desk.rotation.y = yaw;
+    addARLabTable(desk, 1.45, 0.55);
+    group.add(desk);
+  };
+
+  const snapARWallMount = (x, z, yaw, maxDistance = 1.15) => {
+    let best = null;
+    const preferredX = Math.sin(yaw);
+    const preferredZ = Math.cos(yaw);
+    for (const wall of floor.walls || []) {
+      const vx = wall.x2 - wall.x1;
+      const vz = wall.z2 - wall.z1;
+      const l2 = vx * vx + vz * vz;
+      if (l2 < 1e-6) continue;
+      const t = Math.max(0, Math.min(1, ((x - wall.x1) * vx + (z - wall.z1) * vz) / l2));
+      const px = wall.x1 + t * vx;
+      const pz = wall.z1 + t * vz;
+      const dx = x - px;
+      const dz = z - pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > maxDistance * maxDistance) continue;
+      const len = Math.hypot(vx, vz) || 1;
+      const nx = -vz / len;
+      const nz = vx / len;
+      const alignment = Math.abs(nx * preferredX + nz * preferredZ);
+      const score = d2 - alignment * 12.0;
+      if (!best || score < best.score) best = { wall, px, pz, score };
+    }
+    if (!best) return { x, z, yaw };
+    const wx = best.wall.x2 - best.wall.x1;
+    const wz = best.wall.z2 - best.wall.z1;
+    const len = Math.hypot(wx, wz) || 1;
+    let nx = -wz / len;
+    let nz = wx / len;
+    if (nx * preferredX + nz * preferredZ < 0) {
+      nx *= -1;
+      nz *= -1;
+    }
+    return { x: best.px, z: best.pz, yaw: Math.atan2(nx, nz) };
+  };
+
+  const addARWallPanel = (x, z, yaw, color = 0x0ea5e9) => {
+    const mount = snapARWallMount(x, z, yaw);
+    const fg = new THREE.Group();
+    fg.position.set((mount.x - cx) * scale, 0.026, (mount.z - cz) * scale);
+    fg.rotation.y = mount.yaw;
+    const offset = wallThickness * 0.65;
+    fg.position.x += Math.sin(mount.yaw) * offset;
+    fg.position.z += Math.cos(mount.yaw) * offset;
+    addFurniturePart(fg, 0, 1.72, 0, 1.0, 0.72, 0.032, new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.55, metalness: 0.12 }));
+    addFurniturePart(fg, 0, 1.72, 0.018, 0.88, 0.58, 0.012, new THREE.MeshBasicMaterial({ color }));
+    group.add(fg);
+  };
+
+  const addARLabCharts = () => {
+    const chartColors = {
+      '1stfloor': [0x0ea5e9, 0x22c55e, 0x6366f1, 0xf59e0b, 0x06b6d4, 0xef4444],
+      '2ndfloor': [0x2563eb, 0x7c3aed, 0xdc2626, 0x16a34a, 0x0891b2, 0x9333ea],
+      '4thfloor': [0xf97316, 0x14b8a6, 0x2563eb, 0x7c3aed, 0x16a34a, 0xdc2626],
+      '5thfloor': [0x0284c7, 0xdc2626, 0x22c55e, 0x7c3aed, 0xf97316, 0x0ea5e9]
+    }[floorKey];
+    if (!chartColors) return;
+    const placements = [
+      { x: 46.83, z: 22.35, yaw: -Math.PI / 2 },
+      { x: 45.35, z: 19.64, yaw: 0 },
+      { x: 43.93, z: 22.35, yaw: Math.PI / 2 },
+      { x: 46.83, z: 13.20, yaw: -Math.PI / 2 },
+      { x: 43.35, z: 15.56, yaw: Math.PI },
+      { x: 43.35, z: 10.66, yaw: 0 },
+      { x: 46.83, z: 2.00, yaw: -Math.PI / 2 },
+      { x: 43.35, z: 6.26, yaw: Math.PI },
+      { x: 43.35, z: -3.14, yaw: 0 },
+      { x: 45.25, z: -6.14, yaw: Math.PI },
+      { x: 48.83, z: -10.80, yaw: Math.PI / 2 },
+      { x: 43.20, z: -16.24, yaw: 0 },
+      { x: 49.43, z: 12.10, yaw: Math.PI / 2, right: true },
+      { x: 52.60, z: 15.56, yaw: Math.PI, right: true },
+      { x: 52.60, z: 6.26, yaw: 0, right: true },
+      { x: 49.43, z: 1.50, yaw: Math.PI / 2, right: true },
+      { x: 52.60, z: -3.14, yaw: 0, right: true },
+      { x: 52.60, z: 6.26, yaw: Math.PI, right: true },
+      { x: 51.35, z: -6.22, yaw: 0, right: true },
+      { x: 50.53, z: -12.40, yaw: Math.PI / 2, right: true },
+      { x: 53.25, z: -9.04, yaw: Math.PI, right: true }
+    ];
+    if (floorKey === '1stfloor' || floorKey === '5thfloor') {
+      placements.splice(0, 6,
+        { x: 46.83, z: 22.35, yaw: -Math.PI / 2 },
+        { x: 43.35, z: 24.66, yaw: Math.PI },
+        { x: 39.83, z: 22.35, yaw: Math.PI / 2 },
+        { x: 46.83, z: 13.20, yaw: -Math.PI / 2 },
+        { x: 39.83, z: 13.20, yaw: Math.PI / 2 },
+        { x: 43.35, z: 6.26, yaw: 0 }
+      );
+    }
+    placements.forEach((placement, idx) => {
+      addARWallPanel(placement.x, placement.z, placement.yaw, chartColors[(idx + (placement.right ? 1 : 0)) % chartColors.length]);
+    });
   };
 
   (floor.furniture || []).forEach((item) => {
@@ -645,6 +769,8 @@ function createARFloorModel(floorIdx) {
   Object.entries(SMART_BOARD_PLACEMENTS[floorKey] || {}).forEach(([, board]) => {
     addARSmartBoard(board.x, board.z, board.yaw || 0);
   });
+
+  addARLabCharts();
 
   const placedARLabels = [];
   (floor.roomLabels || []).forEach((room, index) => {
