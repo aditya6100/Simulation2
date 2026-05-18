@@ -1768,6 +1768,18 @@ function addLabChartsForFloor(floorKey, elev, walls = []) {
     { x: 53.25, z: -9.04, yaw: Math.PI, right: true }
   ];
 
+  if (floorKey === '1stfloor' || floorKey === '5thfloor') {
+    placements.splice(0, 6,
+      { x: 46.83, z: 22.35, yaw: -Math.PI / 2 },
+      { x: 43.35, z: 24.66, yaw: Math.PI },
+      { x: 39.83, z: 22.35, yaw: Math.PI / 2 },
+
+      { x: 46.83, z: 13.20, yaw: -Math.PI / 2 },
+      { x: 39.83, z: 13.20, yaw: Math.PI / 2 },
+      { x: 43.35, z: 6.26, yaw: 0 }
+    );
+  }
+
   placements.forEach((placement, idx) => {
     const chart = charts[(idx + (placement.right ? 1 : 0)) % charts.length];
     const seed = new THREE.Vector3(placement.x, elev + 1.72, placement.z);
