@@ -438,9 +438,14 @@ function createARFloorModel(floorIdx) {
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.42, metalness: 0.04 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.08, metalness: 0.02, transparent: true, opacity: 0.58 });
   const deskMat = new THREE.MeshStandardMaterial({ color: 0x9a6b3f, roughness: 0.55, metalness: 0.04 });
+  const deskTopMat = new THREE.MeshStandardMaterial({ color: 0xb77945, roughness: 0.42, metalness: 0.04 });
   const chairMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.06 });
   const pcMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.36, metalness: 0.15 });
+  const screenMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.18, metalness: 0.12, emissive: 0x082f49, emissiveIntensity: 0.25 });
   const fixtureMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.42, metalness: 0.08 });
+  const plantMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.75, metalness: 0.02 });
+  const potMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.7, metalness: 0.02 });
+  const boardMat = new THREE.MeshStandardMaterial({ color: 0x052e2b, roughness: 0.34, metalness: 0.05, emissive: 0x064e3b, emissiveIntensity: 0.18 });
   const edgeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.28 });
 
   const base = new THREE.Mesh(new THREE.BoxGeometry(mapW * scale, 0.018, mapD * scale), floorMat);
@@ -496,34 +501,142 @@ function createARFloorModel(floorIdx) {
     group.add(frame);
   });
 
-  const addBox = (x, z, w, d, h, yaw, mat, y = h * scale * 0.5 + 0.022) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.018, w * scale), Math.max(0.018, h * scale), Math.max(0.018, d * scale)), mat);
-    mesh.position.set((x - cx) * scale, y, (z - cz) * scale);
-    mesh.rotation.y = yaw;
+  const addFurniturePart = (parent, lx, ly, lz, w, h, d, mat) => {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.max(0.004, w * scale), Math.max(0.004, h * scale), Math.max(0.004, d * scale)),
+      mat
+    );
+    mesh.position.set(lx * scale, ly * scale, lz * scale);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    group.add(mesh);
+    parent.add(mesh);
     return mesh;
   };
 
-  (floor.furniture || []).forEach((item) => {
+  const addFurnitureCylinder = (parent, lx, ly, lz, radius, h, mat, radialSegments = 12) => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(Math.max(0.003, radius * scale), Math.max(0.003, radius * scale), Math.max(0.006, h * scale), radialSegments),
+      mat
+    );
+    mesh.position.set(lx * scale, ly * scale, lz * scale);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+
+  const addFurnitureGroup = (item) => {
     const n = String(item.name || '').toLowerCase();
-    if (n.includes('stair')) return;
-    if (n.includes('table') || n.includes('desk') || n.includes('rack')) {
-      addBox(item.x, item.z, item.width, item.depth, 0.74, item.angle, deskMat);
-      return;
+    if (n.includes('stair') || n.includes('railing') || n.includes('door') || n.includes('window')) return null;
+    const w = THREE.MathUtils.clamp(item.width || 0.65, 0.22, 2.4);
+    const d = THREE.MathUtils.clamp(item.depth || 0.55, 0.18, 1.8);
+    const h = THREE.MathUtils.clamp(item.height || 0.75, 0.16, 2.1);
+    const yaw = item.angle || 0;
+    const fg = new THREE.Group();
+    fg.position.set((item.x - cx) * scale, 0.026, (item.z - cz) * scale);
+    fg.rotation.y = yaw;
+
+    if (n.includes('chair') || n.includes('seat')) {
+      const seatW = Math.min(w, 0.62);
+      const seatD = Math.min(d, 0.58);
+      addFurniturePart(fg, 0, 0.42, 0, seatW, 0.10, seatD, chairMat);
+      addFurniturePart(fg, 0, 0.78, -seatD * 0.42, seatW, 0.55, 0.08, chairMat);
+      const legW = 0.055;
+      const lx = seatW * 0.38;
+      const lz = seatD * 0.34;
+      addFurniturePart(fg, -lx, 0.21, -lz, legW, 0.42, legW, pcMat);
+      addFurniturePart(fg, lx, 0.21, -lz, legW, 0.42, legW, pcMat);
+      addFurniturePart(fg, -lx, 0.21, lz, legW, 0.42, legW, pcMat);
+      addFurniturePart(fg, lx, 0.21, lz, legW, 0.42, legW, pcMat);
+    } else if (n.includes('bench')) {
+      addFurniturePart(fg, 0, 0.42, 0, w, 0.10, Math.min(d, 0.42), deskTopMat);
+      addFurniturePart(fg, 0, 0.72, -d * 0.34, w, 0.48, 0.08, chairMat);
+      addFurniturePart(fg, -w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
+      addFurniturePart(fg, w * 0.38, 0.21, 0, 0.07, 0.42, 0.07, pcMat);
+    } else if (n.includes('table') || n.includes('desk') || n.includes('rack')) {
+      addFurniturePart(fg, 0, 0.76, 0, w, 0.08, d, deskTopMat);
+      addFurniturePart(fg, 0, 0.48, -d * 0.42, w * 0.85, 0.34, 0.045, deskMat);
+      const legW = 0.055;
+      addFurniturePart(fg, -w * 0.42, 0.38, -d * 0.38, legW, 0.76, legW, pcMat);
+      addFurniturePart(fg, w * 0.42, 0.38, -d * 0.38, legW, 0.76, legW, pcMat);
+      addFurniturePart(fg, -w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
+      addFurniturePart(fg, w * 0.42, 0.38, d * 0.38, legW, 0.76, legW, pcMat);
+    } else if (n.includes('laptop')) {
+      addFurniturePart(fg, 0, 0.05, 0.06, Math.min(w, 0.46), 0.035, Math.min(d, 0.30), pcMat);
+      const screen = addFurniturePart(fg, 0, 0.20, -0.08, Math.min(w, 0.44), 0.28, 0.028, screenMat);
+      screen.rotation.x = -0.18;
+    } else if (n.includes('pc') || n.includes('monitor')) {
+      addFurniturePart(fg, 0, 0.20, 0, 0.42, 0.28, 0.035, screenMat);
+      addFurniturePart(fg, 0, 0.06, 0.05, 0.08, 0.12, 0.06, pcMat);
+      addFurniturePart(fg, 0, 0.005, 0.10, 0.30, 0.025, 0.16, pcMat);
+    } else if (n.includes('tv') || n.includes('board')) {
+      addFurniturePart(fg, 0, 0.85, 0, Math.max(0.7, w), Math.max(0.35, h * 0.55), 0.045, boardMat);
+      addFurniturePart(fg, 0, 0.85, 0.026, Math.max(0.58, w * 0.86), Math.max(0.26, h * 0.42), 0.012, screenMat);
+    } else if (n.includes('toilet') || n.includes('wc')) {
+      addFurniturePart(fg, 0, 0.25, 0.02, Math.min(w, 0.55), 0.30, Math.min(d, 0.62), fixtureMat);
+      addFurniturePart(fg, 0, 0.62, -d * 0.24, Math.min(w, 0.48), 0.42, 0.10, fixtureMat);
+    } else if (n.includes('washbasin') || n.includes('basin')) {
+      addFurniturePart(fg, 0, 0.42, 0, Math.min(w, 0.75), 0.20, Math.min(d, 0.48), fixtureMat);
+      addFurniturePart(fg, 0, 0.18, 0.04, Math.min(w, 0.55), 0.36, Math.min(d, 0.34), deskMat);
+    } else if (n.includes('plant')) {
+      addFurnitureCylinder(fg, 0, 0.18, 0, 0.16, 0.36, potMat, 10);
+      addFurnitureCylinder(fg, 0, 0.58, 0, 0.26, 0.32, plantMat, 12);
+    } else if (n.includes('aquarium')) {
+      addFurniturePart(fg, 0, 0.42, 0, Math.min(w, 1.2), 0.55, Math.min(d, 0.42), glassMat);
+      addFurniturePart(fg, 0, 0.12, 0, Math.min(w, 1.2), 0.24, Math.min(d, 0.42), deskMat);
+    } else {
+      addFurniturePart(fg, 0, h * 0.5, 0, w, h, d, fixtureMat);
     }
-    if (n.includes('chair') || n.includes('seat') || n.includes('bench')) {
-      addBox(item.x, item.z, Math.min(item.width, 0.7), Math.min(item.depth, 0.7), 0.48, item.angle, chairMat);
-      return;
-    }
-    if (n.includes('laptop') || n.includes('pc') || n.includes('monitor')) {
-      addBox(item.x, item.z, 0.42, 0.08, 0.28, item.angle, pcMat, 0.11);
-      return;
-    }
-    if (n.includes('toilet') || n.includes('wc') || n.includes('washbasin')) {
-      addBox(item.x, item.z, Math.min(item.width, 0.7), Math.min(item.depth, 0.7), 0.55, item.angle, fixtureMat);
-    }
+
+    group.add(fg);
+    return fg;
+  };
+
+  const addARBenchDesk = (x, z, yaw = 0, options = {}) => {
+    const fg = new THREE.Group();
+    fg.position.set((x - cx) * scale, 0.026, (z - cz) * scale);
+    fg.rotation.y = yaw;
+    const w = options.width || 1.55;
+    const d = options.depth || 0.78;
+    addFurniturePart(fg, 0, 0.72, 0.16, w, 0.08, d * 0.52, deskTopMat);
+    addFurniturePart(fg, 0, 0.44, -0.26, w, 0.10, d * 0.36, chairMat);
+    addFurniturePart(fg, 0, 0.74, -0.48, w, 0.38, 0.055, chairMat);
+    addFurniturePart(fg, -w * 0.42, 0.36, 0.16, 0.055, 0.72, 0.055, pcMat);
+    addFurniturePart(fg, w * 0.42, 0.36, 0.16, 0.055, 0.72, 0.055, pcMat);
+    addFurniturePart(fg, -w * 0.42, 0.24, -0.26, 0.055, 0.48, 0.055, pcMat);
+    addFurniturePart(fg, w * 0.42, 0.24, -0.26, 0.055, 0.48, 0.055, pcMat);
+    group.add(fg);
+  };
+
+  const addARSmartBoard = (x, z, yaw = 0) => {
+    const fg = new THREE.Group();
+    fg.position.set((x - cx) * scale, 0.026, (z - cz) * scale);
+    fg.rotation.y = yaw;
+    addFurniturePart(fg, 0, 1.5, 0, 2.05, 1.0, 0.055, boardMat);
+    addFurniturePart(fg, 0, 1.5, 0.032, 1.82, 0.78, 0.018, screenMat);
+    addFurniturePart(fg, 0, 0.98, 0.02, 2.1, 0.05, 0.06, pcMat);
+    group.add(fg);
+  };
+
+  (floor.furniture || []).forEach((item) => {
+    addFurnitureGroup(item);
+  });
+
+  const generatedLayouts = floorKey === 'groundgloor'
+    ? GROUND_CLASSROOM_BENCH_LAYOUTS
+    : floorKey === '3rdfloor'
+      ? THIRD_FLOOR_CLASSROOM_BENCH_LAYOUTS
+      : [];
+  generatedLayouts.forEach((room) => {
+    const yaw = room.benchYaw ?? Math.PI;
+    (room.benchXs || []).forEach((x) => {
+      (room.rowZs || []).forEach((z) => addARBenchDesk(x, z, yaw));
+    });
+    if (room.board) addARSmartBoard(room.board.x, room.board.z, room.board.yaw || 0);
+  });
+
+  Object.entries(SMART_BOARD_PLACEMENTS[floorKey] || {}).forEach(([, board]) => {
+    addARSmartBoard(board.x, board.z, board.yaw || 0);
   });
 
   const placedARLabels = [];
