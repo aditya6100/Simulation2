@@ -53,6 +53,7 @@ const UI = {
   mobileQualityBtn: document.getElementById('mobileQualityBtn'),
   movePad: document.getElementById('movePad'),
   mobileInteract: document.getElementById('mobileInteract'),
+  mobileMenuBtn: document.getElementById('mobileMenuBtn'),
   mobileSettingsBtn: document.getElementById('mobileSettingsBtn'),
   mobileSettingsPanel: document.getElementById('mobileSettingsPanel'),
   mobileSettingsClose: document.getElementById('mobileSettingsClose'),
@@ -71,6 +72,7 @@ const MOBILE_DRAG_ITEMS = [
   { key: 'move', selector: '#movePad' },
   { key: 'actions', selector: '#mobileInteract' },
   { key: 'settings', selector: '#mobileSettingsBtn' },
+  { key: 'menu', selector: '#mobileMenuBtn' },
   { key: 'quickbar', selector: '#mobileQuickBar' }
 ];
 
@@ -4340,6 +4342,7 @@ function getMobileLayoutSettings() {
       move: { x: 13, y: 70 },
       actions: { x: 88, y: 66 },
       settings: { x: 88, y: 45 },
+      menu: { x: 88, y: 26 },
       quickbar: { x: 50, y: 8 },
       editor: { x: 76, y: 20 }
     }
@@ -4568,6 +4571,26 @@ function setupMobileLayoutSettings() {
   });
 }
 
+function openMainMenu() {
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (ctrl) {
+    ctrl.enabled = false;
+    ctrl.mobileActive = false;
+    ctrl.resetInput();
+  }
+  document.body.classList.remove('layout-editing');
+  UI.mobileControls?.classList.remove('active');
+  UI.mobileControls?.setAttribute('aria-hidden', 'true');
+  UI.mobileSettingsPanel?.classList.remove('active');
+  UI.mobileSettingsPanel?.setAttribute('aria-hidden', 'true');
+  UI.liftDashboard?.classList.remove('active');
+  UI.liftDashboard?.setAttribute('aria-hidden', 'true');
+  liftDashboardOpen = false;
+  if (UI.overlay) UI.overlay.style.display = 'flex';
+  updateLandscapePrompt();
+  resizeSimulationViewport();
+}
+
 function updateLandscapePrompt() {
   if (!UI.landscapePrompt) return;
   const shouldShow = IS_TOUCH_DEVICE && ctrl?.mobileActive && window.innerHeight > window.innerWidth;
@@ -4675,6 +4698,7 @@ async function init() {
   if (UI.mobileFloorDown) UI.mobileFloorDown.addEventListener('click', () => setMobileFloorOffset(-1));
   if (UI.mobileFloorUp) UI.mobileFloorUp.addEventListener('click', () => setMobileFloorOffset(1));
   if (UI.mobileQualityBtn) UI.mobileQualityBtn.addEventListener('click', cycleMobileQuality);
+  if (UI.mobileMenuBtn) UI.mobileMenuBtn.addEventListener('click', openMainMenu);
   updateMobileQuickBar();
   const startExperience = async () => {
     if (UI.floorSelectOverlay && UI.floorSelectOverlay.selectedIndex !== UI.floorSelect.selectedIndex) {

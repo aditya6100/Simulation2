@@ -966,6 +966,13 @@ body[data-control-size="large"] .touch-action-btn{
   font-size: 12px;
 }
 
+.menu-touch-btn{
+  width: 62px;
+  border-radius: 16px;
+  font-size: 11px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
 #mobileSettingsPanel{
   position: fixed;
   left: 76%;
@@ -1074,6 +1081,7 @@ body.layout-editing #panel-left-bottom,
 body.layout-editing #movePad,
 body.layout-editing #mobileInteract,
 body.layout-editing #mobileSettingsBtn,
+body.layout-editing #mobileMenuBtn,
 body.layout-editing #mobileQuickBar{
   outline: 2px dashed rgba(20, 184, 166, 0.95);
   outline-offset: 4px;
@@ -1087,6 +1095,7 @@ body.layout-editing #panel-left-bottom::before,
 body.layout-editing #movePad::before,
 body.layout-editing #mobileInteract::before,
 body.layout-editing #mobileSettingsBtn::before,
+body.layout-editing #mobileMenuBtn::before,
 body.layout-editing #mobileQuickBar::before{
   content: "Drag";
   position: absolute;
