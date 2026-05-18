@@ -17,6 +17,10 @@ const UI = {
   floorSelect: document.getElementById('floorSelect'),
   startSelect: document.getElementById('startSelect'),
   destSelect: document.getElementById('destSelect'),
+  roomFinderScope: document.getElementById('roomFinderScope'),
+  roomFinderSearch: document.getElementById('roomFinderSearch'),
+  roomFinderSelect: document.getElementById('roomFinderSelect'),
+  roomFinderGoBtn: document.getElementById('roomFinderGoBtn'),
   goBtn: document.getElementById('go-btn'),
   statusMsg: document.getElementById('status-msg'),
   minimapCanvas: document.getElementById('minimap-canvas'),
@@ -46,6 +50,7 @@ let occupancyGrid = null;
 let gridBounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0, width: 0, height: 0 };
 let pickMode = 'start';
 const ACCURACY_WARNING_KEY = 'campus_ar_nav_accuracy_warning_seen_v1';
+const FLOOR_KEYS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 
 // --- 1. UTILS ---
 async function loadJson(url) { try { const r = await fetch(url, { cache: 'no-store' }); return r.ok ? await r.json() : []; } catch(e) { return []; } }
@@ -61,6 +66,117 @@ function showAccuracyWarning() {
     UI.accuracyWarning.classList.remove('active');
     try { localStorage.setItem(ACCURACY_WARNING_KEY, '1'); } catch {}
   }, { once: true });
+}
+
+function getFloorLabel(floorKey) {
+  return Array.from(UI.floorSelect?.options || []).find((opt) => opt.value === floorKey)?.textContent || floorKey;
+}
+
+function dedupeRoomNames(floorKey) {
+  const labels = roomLabels[floorKey] || { left: [], right: [] };
+  const seen = new Set();
+  const out = [];
+  [...(labels.left || []), ...(labels.right || [])].forEach((name) => {
+    const clean = String(name || '').trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    out.push(clean);
+  });
+  return out;
+}
+
+function getRoomFinderEntries() {
+  const scope = UI.roomFinderScope?.value || 'current';
+  const search = (UI.roomFinderSearch?.value || '').trim().toLowerCase();
+  const floorKeys = scope === 'all'
+    ? FLOOR_KEYS.filter((key) => roomLabels[key])
+    : [UI.floorSelect?.value || currentFloor];
+  const entries = [];
+  floorKeys.forEach((floorKey) => {
+    dedupeRoomNames(floorKey).forEach((name) => {
+      if (search && !name.toLowerCase().includes(search)) return;
+      entries.push({ floorKey, floorLabel: getFloorLabel(floorKey), name });
+    });
+  });
+  return entries;
+}
+
+function updateRoomFinderOptions() {
+  if (!UI.roomFinderSelect) return;
+  const entries = getRoomFinderEntries();
+  const current = UI.roomFinderSelect.value;
+  UI.roomFinderSelect.innerHTML = '';
+
+  if (!entries.length) {
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'No matches';
+    UI.roomFinderSelect.appendChild(empty);
+    return;
+  }
+
+  if ((UI.roomFinderScope?.value || 'current') === 'all') {
+    const grouped = new Map();
+    entries.forEach((entry) => {
+      if (!grouped.has(entry.floorKey)) grouped.set(entry.floorKey, []);
+      grouped.get(entry.floorKey).push(entry);
+    });
+    for (const [floorKey, floorEntries] of grouped.entries()) {
+      const group = document.createElement('optgroup');
+      group.label = getFloorLabel(floorKey);
+      floorEntries.forEach((entry) => {
+        const opt = document.createElement('option');
+        opt.value = `${entry.floorKey}::${entry.name}`;
+        opt.textContent = entry.name;
+        group.appendChild(opt);
+      });
+      UI.roomFinderSelect.appendChild(group);
+    }
+  } else {
+    entries.forEach((entry) => {
+      const opt = document.createElement('option');
+      opt.value = `${entry.floorKey}::${entry.name}`;
+      opt.textContent = entry.name;
+      UI.roomFinderSelect.appendChild(opt);
+    });
+  }
+
+  const values = entries.map((entry) => `${entry.floorKey}::${entry.name}`);
+  UI.roomFinderSelect.value = values.includes(current) ? current : values[0];
+}
+
+async function locateSelectedRoom() {
+  if (!UI.roomFinderSelect) return;
+  const value = UI.roomFinderSelect.value;
+  if (!value) {
+    UI.statusMsg.innerText = 'Pick a room first.';
+    return;
+  }
+  const [roomFloor, roomName] = value.split('::');
+  if (roomFloor && roomFloor !== currentFloor) {
+    await loadFloorData(roomFloor);
+  }
+  const loc = navLocations.find((entry) => entry.name === roomName);
+  if (!loc) {
+    UI.statusMsg.innerText = 'Room not found on the selected floor.';
+    return;
+  }
+  destPos = { x: loc.x, z: loc.z };
+  if (UI.destSelect) UI.destSelect.value = loc.id;
+  if (startPos) {
+    path = getPath(snapToWalkable(startPos), snapToWalkable(destPos));
+    if (path.length > 0) {
+      renderMinimap();
+      visualizePath3D();
+      updateRouteSummary(path);
+      UI.statusMsg.innerText = `Room found: ${roomName}. Route ready.`;
+      return;
+    }
+  }
+  path = [];
+  resetRouteSummary();
+  renderMinimap();
+  UI.statusMsg.innerText = `Room found: ${roomName}.`;
 }
 
 // --- 2. DATA LOADING ---
@@ -609,6 +725,10 @@ UI.pickDestBtn.addEventListener('click', () => {
   UI.statusMsg.innerText = 'Click the minimap to set where you want to go.';
 });
 
+if (UI.roomFinderScope) UI.roomFinderScope.addEventListener('change', () => updateRoomFinderOptions());
+if (UI.roomFinderSearch) UI.roomFinderSearch.addEventListener('input', () => updateRoomFinderOptions());
+if (UI.roomFinderGoBtn) UI.roomFinderGoBtn.addEventListener('click', () => locateSelectedRoom());
+
 if (UI.nudgeForward) UI.nudgeForward.addEventListener('click', () => nudgeCurrentPosition(0, -0.4));
 if (UI.nudgeBack) UI.nudgeBack.addEventListener('click', () => nudgeCurrentPosition(0, 0.4));
 if (UI.nudgeLeft) UI.nudgeLeft.addEventListener('click', () => nudgeCurrentPosition(-0.4, 0));
@@ -629,6 +749,7 @@ function updateLocationDropdowns() {
   navLocations = buildNavLocations();
   fillLocationSelect(UI.startSelect, 'Select Current Location');
   fillLocationSelect(UI.destSelect, 'Select Destination');
+  updateRoomFinderOptions();
   resetRouteSummary();
 }
 

@@ -324,6 +324,30 @@
       </div>
 
       <details class="nav-section">
+        <summary>Room Finder</summary>
+        <div class="nav-section-body">
+          <div class="nav-field">
+            <label for="roomFinderScope">Scope</label>
+            <select id="roomFinderScope">
+              <option value="current" selected>Current Floor</option>
+              <option value="all">All Floors</option>
+            </select>
+          </div>
+          <div class="nav-field">
+            <label for="roomFinderSearch">Search Room</label>
+            <input id="roomFinderSearch" type="search" placeholder="Type room name" />
+          </div>
+          <div class="nav-field">
+            <label for="roomFinderSelect">Rooms</label>
+            <select id="roomFinderSelect">
+              <option value="">No rooms loaded</option>
+            </select>
+          </div>
+          <button id="roomFinderGoBtn" class="snap-btn" type="button">Find Room</button>
+        </div>
+      </details>
+
+      <details class="nav-section">
         <summary>Pick & Correct Position</summary>
         <div class="nav-section-body">
           <div class="pick-row">
