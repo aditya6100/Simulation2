@@ -49,7 +49,6 @@ let path = [];
 let occupancyGrid = null;
 let gridBounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0, width: 0, height: 0 };
 let pickMode = 'start';
-const ACCURACY_WARNING_KEY = 'campus_ar_nav_accuracy_warning_seen_v1';
 const FLOOR_KEYS = ['groundgloor', '1stfloor', '2ndfloor', '3rdfloor', '4thfloor', '5thfloor'];
 
 // --- 1. UTILS ---
@@ -58,13 +57,9 @@ const toWorld = (v) => parseFloat(v) * SETTINGS.unitScale || 0;
 
 function showAccuracyWarning() {
   if (!UI.accuracyWarning || !UI.accuracyOk) return;
-  let seen = false;
-  try { seen = localStorage.getItem(ACCURACY_WARNING_KEY) === '1'; } catch {}
-  if (seen) return;
   UI.accuracyWarning.classList.add('active');
   UI.accuracyOk.addEventListener('click', () => {
     UI.accuracyWarning.classList.remove('active');
-    try { localStorage.setItem(ACCURACY_WARNING_KEY, '1'); } catch {}
   }, { once: true });
 }
 
