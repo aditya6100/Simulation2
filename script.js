@@ -716,7 +716,7 @@ function createARFloorModel(floorIdx) {
   const addFurnitureGroup = (item) => {
     const n = String(item.name || '').toLowerCase();
     if (n.includes('stair') || n.includes('railing') || n.includes('door') || n.includes('window')) return null;
-    if (n.includes('chair') || n.includes('seat')) return null;
+    const isChairLike = n.includes('chair') || n.includes('seat');
     const isTableLike = n.includes('table') || n.includes('desk') || n.includes('rack');
     const w = isTableLike
       ? THREE.MathUtils.clamp(item.width || 0.65, 0.22, 4.5)
@@ -730,7 +730,9 @@ function createARFloorModel(floorIdx) {
     fg.position.set((item.x - cx) * scale, 0.026, (item.z - cz) * scale);
     fg.rotation.y = yaw;
 
-    if (n.includes('bench')) {
+    if (isChairLike) {
+      addARChair(fg, Math.min(Math.max(w, 0.38), 0.72), Math.min(Math.max(d, 0.36), 0.68));
+    } else if (n.includes('bench')) {
       addFurniturePart(fg, 0, 0.76, -0.24, Math.max(1.20, w), 0.055, 0.46, benchBlueMat);
       addFurniturePart(fg, 0, 0.46, 0.28, Math.max(1.10, w * 0.92), 0.07, 0.34, benchBlueMat);
       addFurniturePart(fg, 0, 0.74, 0.43, Math.max(1.10, w * 0.92), 0.08, 0.12, benchBlueMat);
@@ -982,7 +984,7 @@ function createARFloorModel(floorIdx) {
 
   (floor.furniture || []).forEach((item) => {
     if (isBlueprint) return;
-    if (isFast && !/table|desk|rack|bench|laptop|pc|monitor|board|tv/i.test(String(item.name || ''))) return;
+    if (isFast && !/chair|seat|table|desk|rack|bench|laptop|pc|monitor|board|tv/i.test(String(item.name || ''))) return;
     addFurnitureGroup(item);
   });
 
